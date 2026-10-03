@@ -4,7 +4,7 @@ FROM python:3.12-slim-bookworm AS builder
 # Set build arguments for versioning and metadata
 ARG BUILD_DATE
 ARG VCS_REF
-ARG VERSION=1.0.0
+ARG VERSION=2.5.0
 
 LABEL org.opencontainers.image.created="${BUILD_DATE}" \
     org.opencontainers.image.authors="AIOps Orchestrator Contributors" \

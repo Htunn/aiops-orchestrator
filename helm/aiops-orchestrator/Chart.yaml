@@ -2,8 +2,8 @@ apiVersion: v2
 name: aiops-orchestrator
 description: A Helm chart for AIOps Orchestrator — multi-channel AI bot with AIOps, OpenTelemetry, and Kubernetes integration
 type: application
-version: 2.2.0
-appVersion: "2.2.0"
+version: 2.5.0
+appVersion: "2.5.0"
 
 keywords:
   - ai

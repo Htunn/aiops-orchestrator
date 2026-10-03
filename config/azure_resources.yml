@@ -1,0 +1,50 @@
+# Azure Resource Management Configuration (SPEC-002)
+#
+# Declares which Azure subscriptions and resource groups the AIOps Orchestrator
+# is allowed to discover and act on via ARM. Resource-group scoping is enforced
+# in src/azure/client.py — resources outside the listed groups are never
+# returned or acted upon, even if the orchestrator's Entra ID identity has
+# broader RBAC access.
+#
+# Environment Variable Substitution:
+#   Use ${VAR_NAME} or ${VAR_NAME:-default} syntax to reference environment
+#   variables (e.g. subscription IDs, feature flags). Never put secrets here —
+#   AZURE_CLIENT_SECRET/AZURE_CLIENT_ID/AZURE_TENANT_ID are read directly from
+#   environment/.env by src/config.py (see Settings.azure_*).
+#
+# Documentation: docs/azure-integration.md (see SPEC-002)
+
+azure:
+  subscriptions:
+    # Scoped to the resource group(s) actually visible to the configured
+    # service principal (confirmed via live ARM call on 2026-10-03).
+    - subscription_id: ${AZURE_SUBSCRIPTION_ID:-}
+      display_name: production
+      resource_group_scope:
+        - htunn-ai
+      tags_filter:
+        environment: production
+
+  monitoring:
+    activity_log_lookback_hours: 24
+    metrics_poll_interval_seconds: 300
+
+  auth:
+    # true  -> use Managed Identity (orchestrator running inside Azure: AKS/VM/Container Apps)
+    # false -> use service principal via AZURE_TENANT_ID/AZURE_CLIENT_ID/AZURE_CLIENT_SECRET env vars
+    use_managed_identity: ${AZURE_USE_MANAGED_IDENTITY:-false}
+
+# Configuration Tips:
+#
+# 1. Least privilege:
+#    - Grant Reader at the resource-group scope for read-only tools.
+#    - Grant Virtual Machine Contributor / Website Contributor / Azure Kubernetes
+#      Service Contributor Role only on the resource groups listed above —
+#      never at subscription scope.
+#
+# 2. Leave `subscriptions` empty (or omit this file) to keep Azure integration
+#    disabled — AzureResourceClient degrades gracefully (is_available = False).
+#
+# 3. Polling intervals:
+#    - Keep metrics_poll_interval_seconds >= 60s to respect Azure Monitor/ARM
+#      throttling limits (see docs: azure-resource-manager/management/request-limits-and-throttling).

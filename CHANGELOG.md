@@ -7,6 +7,39 @@ This project uses [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.5.0] — 2026-10-03
+
+### 🚀 Minor Release: Azure Resource Management via ARM API
+
+AIOps Orchestrator can now discover and remediate Azure resources (VMs, VM Scale Sets, App Services, AKS clusters) from chat, following the same client/handler/approval pattern already used for Kubernetes and the VM platforms. Entra ID–authenticated, RBAC-scoped, and approval-gated for every mutating action.
+
+### Added
+
+#### ☁️ Azure Resource Manager (ARM) Integration
+- **`AzureResourceClient`** (`src/azure/client.py`) — async singleton wrapping `azure-identity` + `azure-mgmt-*`, with lazy init, graceful degrade, and background retry (mirrors `KubernetesClient`)
+- **15 MCP tools** (`src/mcp/azure_server.py`) exposed over stdio JSON-RPC, same convention as the Kubernetes MCP server:
+  - LOW risk (auto-execute): `azure_list_resource_groups`, `azure_list_vms`, `azure_get_vm`, `azure_list_vmss`, `azure_list_app_services`, `azure_list_aks_clusters`, `azure_resource_health`, `azure_activity_log`, `azure_resource_metrics`
+  - MEDIUM risk (approval required): `azure_restart_vm`, `azure_scale_vmss`, `azure_scale_app_service_plan`, `azure_restart_aks_nodepool`
+  - HIGH risk (approval required, explicit warning): `azure_deallocate_vm`, `azure_delete_resource`
+- **`AzureHandler`** (`src/services/azure_handler.py`) — natural-language command parsing wired into chat (`"list vms in resource group prod-rg"`, `"restart vm web-01 in resource group prod-rg"`, etc.), fail-closed when the approval system is unavailable
+- **Resource-group scoping** — `config/azure_resources.yml` restricts discovery/actions to explicitly listed resource groups, enforced in code regardless of the identity's broader RBAC grants
+- **Entra ID auth** — Managed Identity (when running inside Azure) or Service Principal via `AZURE_TENANT_ID`/`AZURE_CLIENT_ID`/`AZURE_CLIENT_SECRET`, selectable via `AZURE_USE_MANAGED_IDENTITY`
+- **`scripts/setup_azure_credentials.sh`** — idempotent setup script: creates/reuses the Entra ID app registration, assigns least-privilege RBAC roles scoped to your resource groups, and safely upserts `.env`/`config/azure_resources.yml` without clobbering unrelated settings (backs up both files first)
+- **`docs/azure-integration.md`** — full setup guide (automated script or manual `az` CLI steps), offline verification, and live verification instructions
+- **60 new unit tests** (`tests/unit/test_azure_{client,server,handler,config}.py`) — scope enforcement, name validation, risk classification, approval gating, error mapping (403/404/429), and fully offline config/credential-selection validation (no live Azure needed)
+
+### Fixed
+- **`main.py`**: `ApprovalManager` was constructed with a reference to `mcp_manager`, which was never instantiated anywhere in the file — a silently-caught `NameError` meant **no approval-gated action of any kind** (Kubernetes included) could actually execute once approved. Now `MCPManager()` is instantiated and started before `ApprovalManager`.
+- **`config.py`**: `.env` values were invisible to the `${VAR_NAME}` substitution used by all three YAML config loaders (`agents.yml`, `api_backends.yml`, `azure_resources.yml`) because `pydantic-settings` parses `.env` without exporting it into `os.environ`. Added a single `load_dotenv()` call to fix this for all three loaders.
+- **`src/azure/client.py`**: `AZURE_INTEGRATION_ENABLED` previously had no effect — now gates `AzureResourceClient` initialization as documented.
+
+### Security
+- Every Azure mutating action routes through the existing `ApprovalManager` human-in-the-loop gate — RBAC permissions bound *what's possible*, approval bounds *what's allowed without a human*.
+- Least-privilege, resource-group-scoped RBAC roles (never subscription-wide); separate Entra ID identity recommended per environment (prod/non-prod).
+- Resource group/VM names validated against Azure's naming pattern before ARM SDK interpolation.
+
+---
+
 ## [2.2.0] — 2026-08-01
 
 ### 🚀 Minor Release: Custom Fine-tuned Model Support & Ollama Thinking Model Streaming

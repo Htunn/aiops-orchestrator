@@ -20,6 +20,8 @@ build/
 *.egg
 .eggs/
 pip-wheel-metadata/
+.github/skills/*
+specs/*
 
 # ── Dev / Mock Servers ───────────────────────────────────────────────────────
 # Allow dev/ directory but ignore virtual environments within it

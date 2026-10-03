@@ -6,10 +6,18 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
+from dotenv import load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from src.models.api_backend import ApiBackendConfig
+
+# pydantic-settings parses `.env` for the Settings model but does not export those
+# values into os.environ — the YAML config loaders below (load_agents_config,
+# load_api_backend_configs, load_azure_resources_config) resolve ${VAR_NAME}
+# references via os.getenv(), so .env must also be loaded into the real process
+# environment. load_dotenv() never overrides a variable already set in the shell.
+load_dotenv()
 
 
 class Settings(BaseSettings):
@@ -223,6 +231,18 @@ class Settings(BaseSettings):
         description="JWT token expiry time in hours",
     )
 
+    # Azure Resource Management (SPEC-002)
+    azure_integration_enabled: bool = Field(
+        default=False, description="Enable Azure ARM resource management integration"
+    )
+    azure_resources_config_path: str = Field(
+        default="config/azure_resources.yml",
+        description="Path to Azure subscriptions/resource-group scope configuration file",
+    )
+    azure_tenant_id: str | None = Field(None, description="Entra ID tenant ID (service principal auth)")
+    azure_client_id: str | None = Field(None, description="Entra ID application (client) ID")
+    azure_client_secret: str | None = Field(None, description="Entra ID application client secret")
+
 
 @lru_cache
 def get_settings() -> Settings:
@@ -323,6 +343,56 @@ def load_agents_config(config_path: str | None = None) -> dict[str, Any]:
 
     except Exception:
         # Return empty dict on any error
+        return {}
+
+
+def load_azure_resources_config(config_path: str | None = None) -> dict[str, Any]:
+    """
+    Load Azure subscriptions/resource-group scope configuration from YAML file.
+
+    Supports environment variable substitution using ${VAR_NAME} or ${VAR_NAME:-default}
+    syntax. Returns an empty dict if the config file doesn't exist or is malformed
+    (Azure integration then stays disabled — see AzureResourceClient.is_available).
+    """
+    if config_path is None:
+        settings = get_settings()
+        config_path = settings.azure_resources_config_path
+
+    config_file = Path(config_path)
+    if not config_file.is_absolute():
+        project_root = Path(__file__).parent.parent
+        config_file = project_root / config_path
+
+    if not config_file.exists():
+        return {}
+
+    try:
+        with open(config_file, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+
+        def _resolve(value: Any) -> Any:
+            if isinstance(value, str) and value.startswith("${") and "}" in value:
+                var_spec = value[2 : value.index("}")]
+                if ":-" in var_spec:
+                    var_name, default_val = var_spec.split(":-", 1)
+                    return os.getenv(var_name, default_val)
+                return os.getenv(var_spec, "")
+            return value
+
+        for sub in data.get("azure", {}).get("subscriptions", []):
+            if "subscription_id" in sub:
+                sub["subscription_id"] = _resolve(sub["subscription_id"])
+
+        auth = data.get("azure", {}).get("auth", {})
+        if "use_managed_identity" in auth:
+            resolved = _resolve(auth["use_managed_identity"])
+            auth["use_managed_identity"] = (
+                str(resolved).lower() in ("true", "1", "yes") if isinstance(resolved, str) else bool(resolved)
+            )
+
+        return data
+
+    except Exception:
         return {}
 
 

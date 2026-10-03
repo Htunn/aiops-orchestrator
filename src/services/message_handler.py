@@ -13,6 +13,7 @@ from src.channels.router import MessageRouter
 from src.database import get_db_session
 from src.database.redis import RedisCache, get_redis
 from src.monitoring.tracing import get_tracer
+from src.services.azure_handler import AzureHandler
 from src.services.platform_handler import PlatformHandler
 from src.services.session_manager import SessionManager
 
@@ -103,6 +104,7 @@ class MessageHandler:
         self.approval_manager = None  # Set by main.py after AIOps init
         self.task_delegator = None  # Set by main.py if A2A enabled
         self.platform_handler = PlatformHandler()  # Platform operations handler
+        self.azure_handler = AzureHandler()  # Azure ARM operations handler (SPEC-002)
         logger.info("message_handler_initialized")
 
     def _format_kubectl_table(self, output: str, resource_type: str = "pods") -> str:
@@ -495,6 +497,11 @@ class MessageHandler:
             # Check if it's a Kubernetes-related query
             if self._is_kubernetes_query(message.content):
                 await self._handle_kubernetes_query(message)
+                return
+
+            # Check if it's an Azure resource management query (SPEC-002)
+            if self.azure_handler.is_azure_query(message.content):
+                await self._handle_azure_query(message)
                 return
 
             # Check if it's a platform management query
@@ -1225,6 +1232,28 @@ class MessageHandler:
         except Exception as e:
             logger.error("platform_query_failed", error=str(e), exc_info=True)
             response = f"❌ **Error processing platform query:** {str(e)}"
+
+        await self.router.send_message(message.channel_type, message.user_id, response)
+
+    async def _handle_azure_query(self, message: ChannelMessage) -> None:
+        """Handle an Azure ARM resource management query (SPEC-002)."""
+        logger.info(
+            "azure_query_detected",
+            channel_type=message.channel_type,
+            user_id=message.user_id,
+            query=message.content,
+        )
+
+        async def _send(channel_target: str, text: str) -> bool:
+            return await self.router.send_message(message.channel_type, channel_target, text)
+
+        response = await self.azure_handler.handle_query(
+            message.content,
+            requested_by=message.user_id,
+            channel_type=message.channel_type,
+            channel_target=message.user_id,
+            send_message_callback=_send,
+        )
 
         await self.router.send_message(message.channel_type, message.user_id, response)
 

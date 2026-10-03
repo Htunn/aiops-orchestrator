@@ -35,6 +35,7 @@ handler: Any = None
 watchloop: Any = None
 api_watchloop: Any = None
 approval_manager: Any = None
+mcp_manager: Any = None
 playbook_executor: Any = None
 agent_registry: Any = None
 
@@ -42,7 +43,7 @@ agent_registry: Any = None
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan manager."""
-    global router, handler, watchloop, api_watchloop, approval_manager, playbook_executor, agent_registry
+    global router, handler, watchloop, api_watchloop, approval_manager, mcp_manager, playbook_executor, agent_registry
 
     logger.info("starting_application", environment=settings.environment)
 
@@ -97,11 +98,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # ──────────────────────────────────────────────────────────────
     try:
         from src.database.redis import get_redis
+        from src.mcp.mcp_manager import MCPManager
         from src.services.approval_manager import ApprovalManager
+
+        mcp_manager = MCPManager()
+        await mcp_manager.start()
 
         approval_manager = ApprovalManager(redis_client=get_redis(), mcp_manager=mcp_manager)
         # Expose on handler so NLP layer can forward approval responses
         handler.approval_manager = approval_manager
+        # Azure ARM actions (SPEC-002) are gated by the same approval manager
+        handler.azure_handler.approval_manager = approval_manager
         logger.info("approval_manager_initialized")
     except Exception as e:
         logger.warning("approval_manager_init_failed", error=str(e))

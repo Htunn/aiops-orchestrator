@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aiops-orchestrator"
-version = "2.2.0"
+version = "2.5.0"
 description = "Production-ready multi-channel AI agent with AIOps, Kubernetes management, A2A multi-agent orchestration, MCP integration, and multi-backend LLM support (GitHub Models, Gemini, vLLM, Ollama)"
 authors = [{name = "AIOps Orchestrator Contributors"}]
 readme = "README.md"

@@ -126,6 +126,43 @@ python scripts/init_db.py
 
 > ⚠️ **Warning**: Do not run this while the application is running, as it may cause database lock issues.
 
+## azure_mcp_server.py
+
+Launch the Azure ARM MCP server standalone (usually called by `MCPManager` automatically; see `.mcp-config.json`).
+
+### Basic Usage
+
+```bash
+# Start Azure MCP server (waits for JSON-RPC requests on stdin)
+python scripts/azure_mcp_server.py
+```
+
+### What It Tests
+
+Exposes 15 Azure Resource Manager tools (list/inspect resources, restart/scale, deallocate/delete) over the same stdio JSON-RPC protocol as `mcp_server.py`. Degrades gracefully — returns an error string from each tool call — when `config/azure_resources.yml` has no subscriptions or Entra ID credentials are not set.
+
+## setup_azure_credentials.sh
+
+Create (or reuse) a least-privilege Entra ID service principal for the Azure integration, assign scoped RBAC roles, and wire `.env` + `config/azure_resources.yml` automatically.
+
+### Basic Usage
+
+```bash
+az login
+# Edit RESOURCE_GROUPS=(...) at the top of the script first
+./scripts/setup_azure_credentials.sh
+```
+
+### What It Does
+
+1. Resolves your subscription/tenant ID via `az account show`
+2. Creates (or reuses, by display name) an App Registration + Service Principal
+3. Assigns `Reader` + `Virtual Machine Contributor` + `Website Contributor` + `Azure Kubernetes Service Contributor Role`, scoped to each listed resource group (never subscription-wide)
+4. **Upserts** `AZURE_*` keys into `.env` — never touches unrelated settings, backs up the file first
+5. Regenerates `config/azure_resources.yml` with your resource groups — backs up the file first
+
+> Safe to re-run. See [docs/azure-integration.md](../docs/azure-integration.md) for the full guide.
+
 ## Examples
 
 ### Development Workflow

@@ -23,6 +23,31 @@
         "k8s_current_context"
       ]
     },
+    "azure": {
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "scripts/azure_mcp_server.py"
+      ],
+      "description": "Azure Resource Manager (ARM) tools — SPEC-002. Degrades gracefully (tools return an error) when config/azure_resources.yml has no subscriptions or Entra ID credentials are not set.",
+      "tools": [
+        "azure_list_resource_groups",
+        "azure_list_vms",
+        "azure_get_vm",
+        "azure_list_vmss",
+        "azure_list_app_services",
+        "azure_list_aks_clusters",
+        "azure_resource_health",
+        "azure_activity_log",
+        "azure_resource_metrics",
+        "azure_restart_vm",
+        "azure_scale_vmss",
+        "azure_scale_app_service_plan",
+        "azure_restart_aks_nodepool",
+        "azure_deallocate_vm",
+        "azure_delete_resource"
+      ]
+    },
     "simplePortChecker": {
       "type": "sse",
       "url": "https://mcp.simpleportchecker.com/mcp",

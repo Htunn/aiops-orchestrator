@@ -40,6 +40,15 @@ cryptography==44.0.3
 # AIOps - Kubernetes async client
 kubernetes-asyncio==29.0.0
 
+# AIOps - Azure Resource Manager integration (SPEC-002)
+azure-identity==1.26.0
+azure-mgmt-resource==26.0.0
+azure-mgmt-compute==38.4.0
+azure-mgmt-web==11.0.1
+azure-mgmt-containerservice==41.7.0
+azure-mgmt-monitor==7.0.0
+azure-mgmt-resourcehealth==1.0.0
+
 # AIOps - Metrics & Monitoring
 # aiohttp 3.9.x had CVE-2024-23334 (path traversal) — patched in 3.10+.
 aiohttp==3.11.18

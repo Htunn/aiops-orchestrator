@@ -7,38 +7,50 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Docker](https://img.shields.io/badge/Docker-ready-blue.svg)](Dockerfile)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psycopg/black)
-[![Version](https://img.shields.io/badge/version-2.2.0-brightgreen.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.5.0-brightgreen.svg)](CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-Production--Stable-success.svg)](CHANGELOG.md)
 
 ---
 
-## 🎉 Latest Release: v2.2.0 (August 1, 2026)
+## 🎉 Latest Release: v2.5.0 (October 3, 2026)
 
 **Status**: Production Ready ✅ | **[Full Changelog →](CHANGELOG.md)**
 
-### New in v2.2.0: Custom AIOps Fine-Tuned Model 🧠
+### New in v2.5.0: Azure Resource Management via ARM API ☁️
 
-Integrates a purpose-built fine-tuned model and adds full support for Ollama `hf.co/` model references:
+AIOps can now discover and remediate Azure resources from chat — VMs, VM Scale Sets, App Services, and AKS clusters — following the same Entra ID–authenticated, RBAC-scoped, approval-gated pattern already used for Kubernetes and the VM platforms:
 
-- **[`hf.co/htunn/gemma-4-e2b-aiops-gguf:Q4_K_M`](https://huggingface.co/htunn/gemma-4-e2b-aiops-gguf)** — Gemma 4 E2B LoRA fine-tuned on K8s, Nutanix, VMware, AD, ADFS, PKI scenarios; outputs execution-ready JSON commands
-- **`Modelfile`** — ships an `aiops-orchestrator:latest` Ollama agent with AIOps system prompt baked in
-- **[`htunn/gemma-4-e2b-aiops-hf`](https://huggingface.co/htunn/gemma-4-e2b-aiops-hf)** — safetensors variant for vLLM (`vllm serve htunn/gemma-4-e2b-aiops-hf --dtype bfloat16`)
-- **`hf.co/` routing fix** — HuggingFace-format Ollama refs are now correctly dispatched to `OllamaClient` (previously misrouted to vLLM)
-- **Thinking model streaming** — `OllamaClient` yields `delta.reasoning` tokens from Gemma 4's reasoning phase
-- **Live e2e test suite** — `tests/e2e/test_ollama_aiops_live.py` (6 tests against real stack + Ollama)
+- **15 MCP tools** — list/inspect resources, read health/activity log/metrics (auto-execute), restart/scale (approval required), deallocate/delete (explicit high-risk approval)
+- **Natural language** — `"list vms in resource group prod-rg"`, `"restart vm web-01 in resource group prod-rg"`
+- **Resource-group scoping** — `config/azure_resources.yml` restricts what's discoverable/actionable, enforced in code regardless of the identity's RBAC grants
+- **`scripts/setup_azure_credentials.sh`** — one-command, idempotent Entra ID service-principal + RBAC + `.env` setup
+- **Fail-closed by design** — mutating actions never execute without a human approval, even if the approval system is temporarily unavailable
+- **60 new unit tests**, entirely offline — no live Azure tenant needed to validate your setup
 
-**Quick start with the custom model:**
+**Quick start:**
 ```bash
-# Via Ollama (GGUF, ~3.5 GB RAM)
-ollama run hf.co/htunn/gemma-4-e2b-aiops-gguf:Q4_K_M
-# Or use the bundled agent
-ollama create aiops-orchestrator -f Modelfile
+# 1. Create credentials (or do it manually — see docs/azure-integration.md)
+./scripts/setup_azure_credentials.sh
 
-# Via vLLM (safetensors, ~9.5 GB RAM)
-vllm serve htunn/gemma-4-e2b-aiops-hf --dtype bfloat16
+# 2. Verify offline (no Azure calls)
+pytest tests/unit/test_azure_config.py -v
+
+# 3. Ask AIOps in chat
+# "list resource groups" / "list vms in resource group prod-rg"
 ```
 
+**Documentation**: [Azure Integration Guide](docs/azure-integration.md)
+
+<details>
+<summary>Previous: v2.2.0 — Custom AIOps Fine-Tuned Model</summary>
+
+**Status**: Production Ready ✅ | **[Full Changelog →](CHANGELOG.md)**
+
+Integrates a purpose-built fine-tuned model ([`hf.co/htunn/gemma-4-e2b-aiops-gguf:Q4_K_M`](https://huggingface.co/htunn/gemma-4-e2b-aiops-gguf)) and adds full support for Ollama `hf.co/` model references, fixes thinking-model streaming (Gemma 4 reasoning phase), and ships a live e2e test suite for Ollama integration.
+
 **Documentation**: [vLLM/Ollama Integration Guide](docs/vllm-ollama-integration.md) | [Testing Guide](docs/vllm-ollama-testing-guide.md)
+
+</details>
 
 <details>
 <summary>Previous: v2.1.0 — Multi-Backend LLM Support</summary>
@@ -52,6 +64,7 @@ Expanded LLM backend support from 2 to **4 backends**: GitHub Models, Google Gem
 ---
 
 ## 📚 Major Features (v2.0.0)
+
 
 #### 🤖 Agent-to-Agent (A2A) Integration
 Multi-agent orchestration platform with intelligent task delegation:
@@ -107,6 +120,7 @@ curl http://localhost:8000/health/api-backends
 - [AI Backends](#ai-backends)
 - [AIOps Engine](#aiops-engine)
 - [Kubernetes Integration](#kubernetes-integration)
+- [Azure Resource Management](#azure-resource-management)
 - [Monitoring & Observability](#monitoring--observability)
 - [Configuration Reference](#configuration-reference)
 - [API Reference](#api-reference)
@@ -163,6 +177,15 @@ AIOps Orchestrator connects **Telegram and Slack** to a powerful backend engine 
 - **Logs** — streaming and snapshot log retrieval
 - **Resource usage** — `top pods`, `top nodes`
 - **Multi-context** — switch between clusters
+
+### ☁️ Azure Resource Management (15 tools)
+- **Full ARM coverage** — resource groups, VMs, VM Scale Sets, App Services, AKS clusters
+- **RCA support** — Azure Resource Health, Activity Log, and Azure Monitor metrics per resource
+- **Natural language** — "list vms in resource group prod-rg", "restart vm web-01 in resource group prod-rg"
+- **Risk-gated remediation** — restart/scale (MEDIUM, approval required), deallocate/delete (HIGH, explicit warning)
+- **Entra ID auth** — Managed Identity or Service Principal, least-privilege RBAC scoped per resource group
+- **Fail-closed** — mutating actions never execute without human approval, even if the approval system is down
+- **Setup script** — `scripts/setup_azure_credentials.sh` automates app registration, RBAC, and `.env`/config wiring
 
 ### AIOps Engine
 - **K8s Watch-Loop** — background polling every 30 s (configurable)
@@ -746,6 +769,35 @@ See [docs/PLATFORM_AUTHENTICATION.md](docs/PLATFORM_AUTHENTICATION.md) and [docs
 
 ---
 
+## Azure Resource Management
+
+Separate from the VM-platform abstraction above, AIOps integrates directly with **Azure Resource Manager (ARM)** — Entra ID–authenticated, RBAC-scoped, and approval-gated, following the industry pattern established by the [Azure MCP Server](https://learn.microsoft.com/en-us/azure/developer/azure-mcp-server/overview).
+
+### Supported Operations (15 MCP tools)
+
+| Risk | Tools | Behavior |
+|---|---|---|
+| LOW | `azure_list_resource_groups`, `azure_list_vms`, `azure_get_vm`, `azure_list_vmss`, `azure_list_app_services`, `azure_list_aks_clusters`, `azure_resource_health`, `azure_activity_log`, `azure_resource_metrics` | Auto-execute |
+| MEDIUM | `azure_restart_vm`, `azure_scale_vmss`, `azure_scale_app_service_plan`, `azure_restart_aks_nodepool` | Requires chat approval |
+| HIGH | `azure_deallocate_vm`, `azure_delete_resource` | Requires chat approval + explicit warning |
+
+### Setup
+
+```bash
+# 1. Automated: creates/reuses the Entra ID app registration, assigns
+#    least-privilege RBAC, and wires .env + config/azure_resources.yml
+./scripts/setup_azure_credentials.sh
+
+# 2. Verify offline — no Azure calls, no real credentials needed
+pytest tests/unit/test_azure_config.py -v
+```
+
+Set `AZURE_USE_MANAGED_IDENTITY=true` instead when running inside Azure (AKS/VM/Container Apps) — no client secret required. Resource visibility is restricted to the resource groups listed in `config/azure_resources.yml`, enforced in code regardless of the identity's broader RBAC grants.
+
+**Documentation**: [Azure Integration Guide](docs/azure-integration.md)
+
+---
+
 ## AIOps Engine
 
 The AIOps engine provides **proactive cluster health monitoring** and **automated remediation** with a human-in-the-loop approval gate.
@@ -943,6 +995,12 @@ Copy `.env.example` to `.env`.
 | `API_BACKENDS_CONFIG_PATH` | — | `config/api_backends.yml` | API monitoring config |
 | `API_WATCHLOOP_ENABLED` | — | `false` | Enable external API monitoring |
 | `API_WATCHLOOP_INTERVAL` | — | `60` | API health check interval (seconds) |
+| `AZURE_INTEGRATION_ENABLED` | — | `false` | Enable Azure ARM resource management |
+| `AZURE_USE_MANAGED_IDENTITY` | — | `false` | Use Managed Identity instead of a service principal |
+| `AZURE_SUBSCRIPTION_ID` | — | — | Azure subscription ID |
+| `AZURE_TENANT_ID` | — | — | Entra ID tenant ID (service principal auth) |
+| `AZURE_CLIENT_ID` | — | — | Entra ID application (client) ID |
+| `AZURE_CLIENT_SECRET` | — | — | Entra ID application client secret ⚠️ **never commit** |
 
 ---
 
