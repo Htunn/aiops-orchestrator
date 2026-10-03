@@ -51,7 +51,9 @@ def _describe_event_resource(event_dict: dict[str, Any]) -> str:
     """
     if "resource_kind" in event_dict:
         scope = f" in `{event_dict['namespace']}`" if event_dict.get("namespace") else ""
-        return f"`{event_dict['resource_kind']}/{event_dict.get('resource_name', 'unknown')}`{scope}"
+        return (
+            f"`{event_dict['resource_kind']}/{event_dict.get('resource_name', 'unknown')}`{scope}"
+        )
     if "platform_name" in event_dict:
         return f"platform `{event_dict['platform_name']}`"
     if "resource_group" in event_dict:
@@ -202,9 +204,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                             f"\n{event.message}"
                         )
                         if matches:
-                            alert_msg += (
-                                f"\n\n🔧 Playbooks queued: `{', '.join(playbook_names)}`"
-                            )
+                            alert_msg += f"\n\n🔧 Playbooks queued: `{', '.join(playbook_names)}`"
                             if approval_manager:
                                 alert_msg += "\nHigh-risk steps will require your approval."
                         await router.send_message(ch_type, ch_id, alert_msg)
@@ -318,7 +318,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # ──────────────────────────────────────────────────────────────
     # AIOps: Azure resource watch-loop (SPEC-003)
     # ──────────────────────────────────────────────────────────────
-    if settings.azure_watchloop_enabled and settings.azure_integration_enabled and _on_cluster_event:
+    if (
+        settings.azure_watchloop_enabled
+        and settings.azure_integration_enabled
+        and _on_cluster_event
+    ):
         try:
             from src.monitoring.azure_watchloop import AzureWatchLoop
 
@@ -328,7 +332,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception as e:
             logger.warning("azure_watchloop_init_failed", error=str(e))
             azure_watchloop = None
-
 
         try:
             from src.services.agent_registry import get_agent_registry

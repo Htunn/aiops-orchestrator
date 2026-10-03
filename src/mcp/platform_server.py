@@ -246,17 +246,35 @@ class PlatformMCPServer:
     async def _platform_restart_vm(self, args: dict[str, Any]) -> str:
         client = await self._get_client(args["platform_name"])
         ok = await client.restart_vm(args["vm_id"])
-        return str({"status": "succeeded" if ok else "failed", "operation": "restart_vm", "vm_id": args["vm_id"]})
+        return str(
+            {
+                "status": "succeeded" if ok else "failed",
+                "operation": "restart_vm",
+                "vm_id": args["vm_id"],
+            }
+        )
 
     async def _platform_start_vm(self, args: dict[str, Any]) -> str:
         client = await self._get_client(args["platform_name"])
         ok = await client.start_vm(args["vm_id"])
-        return str({"status": "succeeded" if ok else "failed", "operation": "start_vm", "vm_id": args["vm_id"]})
+        return str(
+            {
+                "status": "succeeded" if ok else "failed",
+                "operation": "start_vm",
+                "vm_id": args["vm_id"],
+            }
+        )
 
     async def _platform_stop_vm(self, args: dict[str, Any]) -> str:
         client = await self._get_client(args["platform_name"])
         ok = await client.stop_vm(args["vm_id"], args.get("force", False))
-        return str({"status": "succeeded" if ok else "failed", "operation": "stop_vm", "vm_id": args["vm_id"]})
+        return str(
+            {
+                "status": "succeeded" if ok else "failed",
+                "operation": "stop_vm",
+                "vm_id": args["vm_id"],
+            }
+        )
 
     def _create_error_response(
         self, request_id: Any, code: int, message: str, data: Any | None = None

@@ -51,7 +51,9 @@ class Rule:
     # Optional filters: only trigger when labels/namespace match
     namespace_filter: str | None = None  # regex pattern
     severity_filter: str | None = None  # critical | warning | info
-    platform_filter: str | None = None  # regex pattern for platform_name (VM platforms) or resource_group (Azure)
+    platform_filter: str | None = (
+        None  # regex pattern for platform_name (VM platforms) or resource_group (Azure)
+    )
     # Extra condition params (e.g., restart threshold)
     params: dict[str, Any] = field(default_factory=dict)
 

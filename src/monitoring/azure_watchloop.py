@@ -106,7 +106,9 @@ class AzureWatchLoop:
     @staticmethod
     def _default_interval() -> int:
         config = load_azure_resources_config()
-        return int(config.get("azure", {}).get("monitoring", {}).get("metrics_poll_interval_seconds", 300))
+        return int(
+            config.get("azure", {}).get("monitoring", {}).get("metrics_poll_interval_seconds", 300)
+        )
 
     async def start(self) -> None:
         """Start the watchloop."""
@@ -188,7 +190,9 @@ class AzureWatchLoop:
                             }
                         )
                 except Exception as e:
-                    logger.warning("azure_watchloop_discover_vms_failed", resource_group=rg, error=str(e))
+                    logger.warning(
+                        "azure_watchloop_discover_vms_failed", resource_group=rg, error=str(e)
+                    )
 
                 try:
                     for app in await client.list_app_services(rg, sub_id):
@@ -203,7 +207,9 @@ class AzureWatchLoop:
                         )
                 except Exception as e:
                     logger.warning(
-                        "azure_watchloop_discover_app_services_failed", resource_group=rg, error=str(e)
+                        "azure_watchloop_discover_app_services_failed",
+                        resource_group=rg,
+                        error=str(e),
                     )
 
                 try:
@@ -231,7 +237,9 @@ class AzureWatchLoop:
         try:
             health = await client.resource_health(resource_id, resource["subscription_id"])
         except Exception as e:
-            logger.warning("azure_watchloop_health_check_failed", resource_id=resource_id, error=str(e))
+            logger.warning(
+                "azure_watchloop_health_check_failed", resource_id=resource_id, error=str(e)
+            )
             return
 
         state = health.get("availability_state", "Unknown")
@@ -273,8 +281,8 @@ class AzureWatchLoop:
     async def _check_activity_logs(self, client: Any) -> None:
         """Check Activity Log per resource group for VM deallocate/poweroff entries."""
         config = load_azure_resources_config()
-        lookback_hours = config.get("azure", {}).get("monitoring", {}).get(
-            "activity_log_lookback_hours", 24
+        lookback_hours = (
+            config.get("azure", {}).get("monitoring", {}).get("activity_log_lookback_hours", 24)
         )
         subscriptions = config.get("azure", {}).get("subscriptions", [])
 
@@ -284,7 +292,9 @@ class AzureWatchLoop:
                 try:
                     entries = await client.activity_log(rg, lookback_hours, sub_id)
                 except Exception as e:
-                    logger.warning("azure_watchloop_activity_log_failed", resource_group=rg, error=str(e))
+                    logger.warning(
+                        "azure_watchloop_activity_log_failed", resource_group=rg, error=str(e)
+                    )
                     continue
 
                 for entry in entries:
