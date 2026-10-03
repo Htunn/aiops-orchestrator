@@ -378,6 +378,80 @@ class PlaybookRegistry:
             )
         )
 
+        # ── VM Platform Remediation Playbook (SPEC-003) ───────────────────────
+
+        self.register(
+            Playbook(
+                id="platform_vm_remediation",
+                name="Platform VM Remediation",
+                description="Diagnose and remediate a degraded/unreachable Nutanix/VMware/OpenShift platform",
+                steps=[
+                    PlaybookStep(
+                        name="List Platform VMs",
+                        description="Enumerate VMs on the affected platform for triage",
+                        risk_level=RiskLevel.LOW,
+                        tool_name="platform_list_vms",
+                        tool_params_template={
+                            "platform_name": "{platform_name}",
+                        },
+                    ),
+                    PlaybookStep(
+                        name="Restart Affected VM",
+                        description="Restart the VM identified as the source of the incident",
+                        risk_level=RiskLevel.MEDIUM,
+                        tool_name="platform_restart_vm",
+                        tool_params_template={
+                            "platform_name": "{platform_name}",
+                            "vm_id": "{vm_id}",
+                        },
+                    ),
+                ],
+            )
+        )
+
+        # ── Azure Resource Remediation Playbook (SPEC-003) ────────────────────
+
+        self.register(
+            Playbook(
+                id="azure_resource_remediation",
+                name="Azure Resource Remediation",
+                description="Diagnose and remediate an unhealthy or deallocated Azure resource",
+                steps=[
+                    PlaybookStep(
+                        name="Check Resource Health",
+                        description="Query Azure Resource Health for current availability status",
+                        risk_level=RiskLevel.LOW,
+                        tool_name="azure_resource_health",
+                        tool_params_template={
+                            "resource_id": "{resource_id}",
+                            "subscription_id": "{subscription_id}",
+                        },
+                    ),
+                    PlaybookStep(
+                        name="Check Activity Log",
+                        description="Review recent Activity Log entries for the resource group",
+                        risk_level=RiskLevel.LOW,
+                        tool_name="azure_activity_log",
+                        tool_params_template={
+                            "resource_group": "{resource_group}",
+                            "subscription_id": "{subscription_id}",
+                        },
+                    ),
+                    PlaybookStep(
+                        name="Restart VM",
+                        description="Restart the affected Azure VM",
+                        risk_level=RiskLevel.MEDIUM,
+                        tool_name="azure_restart_vm",
+                        tool_params_template={
+                            "resource_group": "{resource_group}",
+                            "vm_name": "{resource_name}",
+                            "subscription_id": "{subscription_id}",
+                        },
+                    ),
+                ],
+            )
+        )
+
     def register(self, playbook: Playbook) -> None:
         self._playbooks[playbook.id] = playbook
         logger.debug("playbook_registered", playbook_id=playbook.id, name=playbook.name)

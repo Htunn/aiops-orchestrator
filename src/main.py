@@ -33,10 +33,31 @@ router: Any = None
 handler: Any = None
 watchloop: Any = None
 api_watchloop: Any = None
+platform_watchloop: Any = None
+azure_watchloop: Any = None
 approval_manager: Any = None
 mcp_manager: Any = None
 playbook_executor: Any = None
 agent_registry: Any = None
+
+
+def _describe_event_resource(event_dict: dict[str, Any]) -> str:
+    """
+    Build a human-readable resource descriptor from a shared event dict (SPEC-003).
+
+    All watch-loop events guarantee `event_type`/`severity`/`message`/`detected_at`
+    plus exactly one domain-scoping field (`namespace` for K8s, `platform_name` for
+    VM platforms, `resource_group` for Azure) — see docs' shared event contract.
+    """
+    if "resource_kind" in event_dict:
+        scope = f" in `{event_dict['namespace']}`" if event_dict.get("namespace") else ""
+        return f"`{event_dict['resource_kind']}/{event_dict.get('resource_name', 'unknown')}`{scope}"
+    if "platform_name" in event_dict:
+        return f"platform `{event_dict['platform_name']}`"
+    if "resource_group" in event_dict:
+        kind = event_dict.get("resource_type", "resource")
+        return f"`{kind}/{event_dict.get('resource_name', 'unknown')}` in `{event_dict['resource_group']}`"
+    return f"`{event_dict.get('resource_name', 'unknown')}`"
 
 
 @asynccontextmanager
@@ -47,6 +68,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         handler, \
         watchloop, \
         api_watchloop, \
+        platform_watchloop, \
+        azure_watchloop, \
         approval_manager, \
         mcp_manager, \
         playbook_executor, \
@@ -134,89 +157,103 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             logger.warning("a2a_task_delegator_init_failed", error=str(e))
 
     # ──────────────────────────────────────────────────────────────
-    # AIOps: K8s watch-loop (proactive cluster health polling)
+    # AIOps: Rule Engine + Playbook Executor (SPEC-003 — shared by every
+    # watch-loop: K8s, API backends, VM platforms, Azure. Built unconditionally
+    # so any one domain's watch-loop can be enabled independently of the others.
     # ──────────────────────────────────────────────────────────────
-    if settings.k8s_watchloop_enabled:
-        try:
-            from src.aiops.playbooks import PlaybookExecutor, PlaybookRegistry
-            from src.aiops.rule_engine import RuleEngine
-            from src.monitoring.watchloop import K8sWatchLoop
+    try:
+        from src.aiops.playbooks import PlaybookExecutor, PlaybookRegistry
+        from src.aiops.rule_engine import RuleEngine
 
-            rule_engine = RuleEngine()
-            # Hoist registry + executor once at startup — not per-event
-            _pb_registry = PlaybookRegistry()
-            playbook_executor = PlaybookExecutor(
-                registry=_pb_registry,
-                mcp_manager=mcp_manager,
-                approval_manager=approval_manager,
-                notify_callback=router.send_message if router else None,
-            )
+        rule_engine = RuleEngine()
+        # Hoist registry + executor once at startup — not per-event
+        _pb_registry = PlaybookRegistry()
+        playbook_executor = PlaybookExecutor(
+            registry=_pb_registry,
+            mcp_manager=mcp_manager,
+            approval_manager=approval_manager,
+            notify_callback=router.send_message if router else None,
+        )
 
-            async def _on_cluster_event(event: Any) -> None:
-                """Route watch-loop events → rule engine → approval / auto-remediation."""
-                try:
-                    matches = rule_engine.evaluate(event.to_dict())
-                    if not matches:
-                        return
+        async def _on_cluster_event(event: Any) -> None:
+            """Route watch-loop events → rule engine → approval / auto-remediation."""
+            try:
+                event_dict = event.to_dict()
+                matches = rule_engine.evaluate(event_dict)
+                if not matches:
+                    return
 
-                    # Notify AIOps channel about detected issue
+                # Notify AIOps channel about detected issue
+                if settings.aiops_notification_channel:
+                    parts = settings.aiops_notification_channel.split(":", 1)
+                    if len(parts) == 2:
+                        ch_type, ch_id = parts
+                        icon = {
+                            "critical": "🚨",
+                            "high": "🔴",
+                            "medium": "🟡",
+                            "low": "🔵",
+                        }.get(event.severity, "⚠️")
+                        playbook_names = [r for _, r in matches]
+                        alert_msg = (
+                            f"{icon} **AIOps Alert** [{event.severity.upper()}]\n"
+                            f"Type: `{event.event_type}`\n"
+                            f"Resource: {_describe_event_resource(event_dict)}"
+                            f"\n{event.message}"
+                        )
+                        if matches:
+                            alert_msg += (
+                                f"\n\n🔧 Playbooks queued: `{', '.join(playbook_names)}`"
+                            )
+                            if approval_manager:
+                                alert_msg += "\nHigh-risk steps will require your approval."
+                        await router.send_message(ch_type, ch_id, alert_msg)
+
+                # Execute playbooks via PlaybookExecutor
+                if settings.auto_remediation_enabled and playbook_executor:
+                    ch_type, ch_id = "", ""
                     if settings.aiops_notification_channel:
                         parts = settings.aiops_notification_channel.split(":", 1)
                         if len(parts) == 2:
                             ch_type, ch_id = parts
-                            icon = {
-                                "critical": "🚨",
-                                "high": "🔴",
-                                "medium": "🟡",
-                                "low": "🔵",
-                            }.get(event.severity, "⚠️")
-                            playbook_names = [r for _, r in matches]
-                            alert_msg = (
-                                f"{icon} **AIOps Alert** [{event.severity.upper()}]\n"
-                                f"Type: `{event.event_type}`\n"
-                                f"Resource: `{event.resource_kind}/{event.resource_name}`"
-                                + (f" in `{event.namespace}`" if event.namespace else "")
-                                + f"\n{event.message}"
+
+                    for _, playbook_id in matches:
+                        try:
+                            run = await playbook_executor.execute(
+                                playbook_id=playbook_id,
+                                incident_context=event_dict,
+                                channel_type=ch_type,
+                                channel_target=ch_id,
+                                requested_by="watchloop",
                             )
-                            if matches:
-                                alert_msg += (
-                                    f"\n\n🔧 Playbooks queued: `{', '.join(playbook_names)}`"
-                                )
-                                if approval_manager:
-                                    alert_msg += "\nHigh-risk steps will require your approval."
-                            await router.send_message(ch_type, ch_id, alert_msg)
+                            logger.info(
+                                "playbook_run_finished",
+                                playbook=playbook_id,
+                                status=run.status,
+                                steps_done=len(run.step_outputs),
+                            )
+                        except Exception as pb_exc:
+                            logger.error(
+                                "playbook_execution_error",
+                                playbook=playbook_id,
+                                error=str(pb_exc),
+                            )
+            except Exception as exc:
+                logger.error("watchloop_event_handler_error", error=str(exc))
 
-                    # Execute playbooks via PlaybookExecutor
-                    if settings.auto_remediation_enabled and playbook_executor:
-                        ch_type, ch_id = "", ""
-                        if settings.aiops_notification_channel:
-                            parts = settings.aiops_notification_channel.split(":", 1)
-                            if len(parts) == 2:
-                                ch_type, ch_id = parts
+        logger.info("aiops_rule_engine_and_playbook_executor_initialized")
+    except Exception as e:
+        logger.warning("aiops_pipeline_init_failed", error=str(e))
+        rule_engine = None
+        playbook_executor = None
+        _on_cluster_event = None
 
-                        for _, playbook_id in matches:
-                            try:
-                                run = await playbook_executor.execute(
-                                    playbook_id=playbook_id,
-                                    incident_context=event.to_dict(),
-                                    channel_type=ch_type,
-                                    channel_target=ch_id,
-                                    requested_by="watchloop",
-                                )
-                                logger.info(
-                                    "playbook_run_finished",
-                                    playbook=playbook_id,
-                                    status=run.status,
-                                    steps_done=len(run.step_outputs),
-                                )
-                            except Exception as pb_exc:
-                                logger.error(
-                                    "playbook_execution_error",
-                                    playbook=playbook_id,
-                                    error=str(pb_exc),
-                                )
-                except Exception as exc:
-                    logger.error("watchloop_event_handler_error", error=str(exc))
+    # ──────────────────────────────────────────────────────────────
+    # AIOps: K8s watch-loop (proactive cluster health polling)
+    # ──────────────────────────────────────────────────────────────
+    if settings.k8s_watchloop_enabled and _on_cluster_event:
+        try:
+            from src.monitoring.watchloop import K8sWatchLoop
 
             watchloop = K8sWatchLoop(
                 event_callback=_on_cluster_event,
@@ -232,7 +269,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             watchloop = None
 
     # AIOps: API Backend watch-loop (external service health monitoring)
-    if settings.api_backend_monitoring_enabled:
+    if settings.api_backend_monitoring_enabled and _on_cluster_event:
         try:
             from src.config import load_api_backend_configs
             from src.monitoring.api_watchloop import ApiBackendWatchLoop
@@ -259,9 +296,40 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             api_watchloop = None
 
     # ──────────────────────────────────────────────────────────────
-    # A2A: Agent-to-Agent Integration (agent registry & delegation)
+    # AIOps: Platform (Nutanix/VMware/OpenShift) watch-loop (SPEC-003)
     # ──────────────────────────────────────────────────────────────
-    if settings.a2a_enabled:
+    if settings.platform_watchloop_enabled and _on_cluster_event:
+        try:
+            from src.monitoring.platform_watchloop import PlatformWatchLoop
+
+            platform_watchloop = PlatformWatchLoop(
+                event_callback=_on_cluster_event,  # Same callback handles every domain
+                interval=settings.platform_watchloop_interval,
+            )
+            asyncio.create_task(platform_watchloop.start())
+            logger.info(
+                "platform_watchloop_started",
+                interval=settings.platform_watchloop_interval,
+            )
+        except Exception as e:
+            logger.warning("platform_watchloop_init_failed", error=str(e))
+            platform_watchloop = None
+
+    # ──────────────────────────────────────────────────────────────
+    # AIOps: Azure resource watch-loop (SPEC-003)
+    # ──────────────────────────────────────────────────────────────
+    if settings.azure_watchloop_enabled and settings.azure_integration_enabled and _on_cluster_event:
+        try:
+            from src.monitoring.azure_watchloop import AzureWatchLoop
+
+            azure_watchloop = AzureWatchLoop(event_callback=_on_cluster_event)
+            asyncio.create_task(azure_watchloop.start())
+            logger.info("azure_watchloop_started")
+        except Exception as e:
+            logger.warning("azure_watchloop_init_failed", error=str(e))
+            azure_watchloop = None
+
+
         try:
             from src.services.agent_registry import get_agent_registry
 
@@ -344,6 +412,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await watchloop.stop()
         logger.info("k8s_watchloop_stopped")
 
+    # Stop API backend watch-loop
+    if api_watchloop:
+        await api_watchloop.stop()
+        logger.info("api_watchloop_stopped")
+
+    # Stop Platform watch-loop
+    if platform_watchloop:
+        await platform_watchloop.stop()
+        logger.info("platform_watchloop_stopped")
+
+    # Stop Azure watch-loop
+    if azure_watchloop:
+        await azure_watchloop.stop()
+        logger.info("azure_watchloop_stopped")
+
     # Stop channel adapters
     await router.stop_all()
 
@@ -398,6 +481,16 @@ def get_watchloop() -> Any:
 def get_api_watchloop() -> Any:
     """Return current API backend watchloop instance (for health checks)."""
     return api_watchloop
+
+
+def get_platform_watchloop() -> Any:
+    """Return current platform watchloop instance (for health checks)."""
+    return platform_watchloop
+
+
+def get_azure_watchloop() -> Any:
+    """Return current Azure watchloop instance (for health checks)."""
+    return azure_watchloop
 
 
 def get_approval_manager() -> Any:

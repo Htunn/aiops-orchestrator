@@ -52,9 +52,11 @@ class TestScopeEnforcement:
     async def test_list_vms_allows_in_scope_resource_group(self):
         client, sub = _make_client(resource_group_scope=["prod-rg"])
         compute_client = MagicMock()
+        vm_id = "/subscriptions/sub-1/resourceGroups/prod-rg/providers/Microsoft.Compute/virtualMachines/web-01"
 
         async def _vm_iter(_rg):
             vm = MagicMock()
+            vm.id = vm_id
             vm.name = "web-01"
             vm.location = "eastus"
             vm.hardware_profile.vm_size = "Standard_D2s_v3"
@@ -67,6 +69,7 @@ class TestScopeEnforcement:
         result = await client.list_vms("prod-rg")
         assert result == [
             {
+                "id": vm_id,
                 "name": "web-01",
                 "location": "eastus",
                 "vm_size": "Standard_D2s_v3",

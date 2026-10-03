@@ -403,6 +403,7 @@ class AzureResourceClient:
         async for app in client.web_apps.list_by_resource_group(resource_group):
             result.append(
                 {
+                    "id": app.id,
                     "name": app.name,
                     "location": app.location,
                     "state": getattr(app, "state", None),
@@ -430,6 +431,7 @@ class AzureResourceClient:
                 continue
             result.append(
                 {
+                    "id": cluster.id,
                     "name": cluster.name,
                     "location": cluster.location,
                     "kubernetes_version": getattr(cluster, "kubernetes_version", None),
@@ -668,6 +670,7 @@ class AzureResourceClient:
                     power_state = code.split("/", 1)[1]
                     break
         return {
+            "id": vm.id,
             "name": vm.name,
             "location": vm.location,
             "vm_size": vm.hardware_profile.vm_size if vm.hardware_profile else None,

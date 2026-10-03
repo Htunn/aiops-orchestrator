@@ -118,6 +118,24 @@ class Settings(BaseSettings):
         default=True, description="Enable K8s watchloop background task"
     )
 
+    # AIOps - Platform (Nutanix/VMware/OpenShift) watchloop (SPEC-003)
+    platform_watchloop_enabled: bool = Field(
+        default=False, description="Enable VM-platform health watchloop background task"
+    )
+    platform_watchloop_interval: int = Field(
+        default=60, ge=10, description="Platform watchloop poll interval in seconds (min 10)"
+    )
+
+    # AIOps - Azure resource watchloop (SPEC-003)
+    azure_watchloop_enabled: bool = Field(
+        default=False, description="Enable Azure resource health watchloop background task"
+    )
+    azure_watchloop_discovery_refresh_ticks: int = Field(
+        default=10,
+        ge=1,
+        description="Re-discover Azure resources every N health-check ticks (cached between)",
+    )
+
     # AIOps - Remediation
     auto_remediation_enabled: bool = Field(
         default=False, description="Enable fully automatic remediation (no approval)"

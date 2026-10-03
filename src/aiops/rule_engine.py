@@ -28,6 +28,14 @@ class RuleCondition(StrEnum):
     API_HIGH_LATENCY = "api_high_latency"
     API_HIGH_ERROR_RATE = "api_high_error_rate"
     API_SSL_EXPIRING = "api_ssl_expiring"
+    # VM platform monitoring conditions (SPEC-003) — values match the
+    # event_type strings PlatformWatchLoop already emits (src/monitoring/platform_watchloop.py)
+    PLATFORM_UNREACHABLE = "unreachable"
+    PLATFORM_DEGRADED = "health_degraded"
+    PLATFORM_RECOVERED = "health_recovered"
+    # Azure resource monitoring conditions (SPEC-003)
+    AZURE_RESOURCE_UNHEALTHY = "azure_resource_unhealthy"
+    AZURE_VM_DEALLOCATED = "azure_vm_deallocated"
 
 
 @dataclass
@@ -43,6 +51,7 @@ class Rule:
     # Optional filters: only trigger when labels/namespace match
     namespace_filter: str | None = None  # regex pattern
     severity_filter: str | None = None  # critical | warning | info
+    platform_filter: str | None = None  # regex pattern for platform_name (VM platforms) or resource_group (Azure)
     # Extra condition params (e.g., restart threshold)
     params: dict[str, Any] = field(default_factory=dict)
 
@@ -66,7 +75,14 @@ class Rule:
 
             if not re.search(self.endpoint_filter, event["endpoint_name"]):
                 return False
-            return False
+
+        if self.platform_filter:
+            import re
+
+            scope_value = event.get("platform_name") or event.get("resource_group")
+            if scope_value and not re.search(self.platform_filter, scope_value):
+                return False
+
         return True
 
 
@@ -131,6 +147,36 @@ class RuleEngine:
             name="API High Error Rate Investigation",
             condition=RuleCondition.API_HIGH_ERROR_RATE,
             playbook_id="api_error_rate_investigation",
+            severity_filter="critical",
+        ),
+        # VM platform monitoring rules (SPEC-003)
+        Rule(
+            id="rule-008",
+            name="Platform VM Unreachable Remediation",
+            condition=RuleCondition.PLATFORM_UNREACHABLE,
+            playbook_id="platform_vm_remediation",
+            severity_filter="critical",
+        ),
+        Rule(
+            id="rule-009",
+            name="Platform VM Degraded Remediation",
+            condition=RuleCondition.PLATFORM_DEGRADED,
+            playbook_id="platform_vm_remediation",
+            severity_filter="warning",
+        ),
+        # Azure resource monitoring rules (SPEC-003)
+        Rule(
+            id="rule-010",
+            name="Azure Resource Unhealthy Remediation",
+            condition=RuleCondition.AZURE_RESOURCE_UNHEALTHY,
+            playbook_id="azure_resource_remediation",
+            severity_filter="critical",
+        ),
+        Rule(
+            id="rule-011",
+            name="Azure VM Deallocated Remediation",
+            condition=RuleCondition.AZURE_VM_DEALLOCATED,
+            playbook_id="azure_resource_remediation",
             severity_filter="critical",
         ),
     ]

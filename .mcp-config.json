@@ -48,6 +48,22 @@
         "azure_delete_resource"
       ]
     },
+    "platform": {
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "scripts/platform_mcp_server.py"
+      ],
+      "description": "VM platform (Nutanix/VMware/OpenShift) tools — SPEC-003. Degrades gracefully (tools return an error) when a platform is not configured.",
+      "tools": [
+        "platform_list_vms",
+        "platform_get_vm",
+        "platform_list_hosts",
+        "platform_restart_vm",
+        "platform_start_vm",
+        "platform_stop_vm"
+      ]
+    },
     "simplePortChecker": {
       "type": "sse",
       "url": "https://mcp.simpleportchecker.com/mcp",
