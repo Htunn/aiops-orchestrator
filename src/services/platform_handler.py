@@ -78,7 +78,7 @@ class PlatformHandler:
         "status",
     ]
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize platform handler."""
         pass
 
@@ -137,7 +137,7 @@ class PlatformHandler:
 
         # Find VM across platforms
         platform_name, vm = await self._find_vm(vm_identifier)
-        if not vm:
+        if not platform_name or not vm:
             return {
                 "success": False,
                 "error": f"VM not found: {vm_identifier}",
@@ -202,7 +202,7 @@ class PlatformHandler:
             }
 
         platform_name, vm = await self._find_vm(vm_identifier)
-        if not vm:
+        if not platform_name or not vm:
             return {
                 "success": False,
                 "error": f"VM not found: {vm_identifier}",
@@ -253,7 +253,7 @@ class PlatformHandler:
         force = "force" in command.lower()
 
         platform_name, vm = await self._find_vm(vm_identifier)
-        if not vm:
+        if not platform_name or not vm:
             return {
                 "success": False,
                 "error": f"VM not found: {vm_identifier}",

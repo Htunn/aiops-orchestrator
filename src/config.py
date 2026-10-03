@@ -189,6 +189,9 @@ class Settings(BaseSettings):
     otlp_endpoint: str | None = Field(
         None, description="OTLP gRPC endpoint, e.g. http://jaeger:4317"
     )
+    otel_sample_rate: float = Field(
+        default=1.0, ge=0.0, le=1.0, description="Fraction of traces to sample (0.0-1.0)"
+    )
 
     # AIOps - API Backend Monitoring
     api_backends_config_path: str = Field(

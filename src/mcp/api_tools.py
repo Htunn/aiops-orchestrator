@@ -12,6 +12,7 @@ import asyncio
 import json
 import socket
 import ssl
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlparse
@@ -48,7 +49,7 @@ class ApiDiagnosticTools:
             duration_ms = (datetime.now(UTC) - start).total_seconds() * 1000
 
             # Extract unique IP addresses
-            ips = list({addr[4][0] for addr in addrs})
+            ips: list[str] = list({str(addr[4][0]) for addr in addrs})
 
             return {
                 "success": True,
@@ -108,7 +109,7 @@ class ApiDiagnosticTools:
                     response = await client.request(method, url, headers=headers or {})
                 duration_ms = (datetime.now(UTC) - start).total_seconds() * 1000
 
-                result = {
+                result: dict[str, Any] = {
                     "attempt": i + 1,
                     "status_code": response.status_code,
                     "latency_ms": round(duration_ms, 2),
@@ -405,7 +406,7 @@ async def call_tool(tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]
     Returns:
         Tool execution result
     """
-    tools_map = {
+    tools_map: dict[str, Callable[..., Any]] = {
         "api_dns_lookup": ApiDiagnosticTools.dns_lookup,
         "api_curl_test": ApiDiagnosticTools.curl_test,
         "api_ssl_check": ApiDiagnosticTools.ssl_check,

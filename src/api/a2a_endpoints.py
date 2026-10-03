@@ -5,7 +5,6 @@ from datetime import UTC, datetime
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Path, status
-from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import AgentMessage, AgentTask
@@ -67,26 +66,25 @@ async def verify_a2a_auth(
 @router.post("/register", response_model=AgentInfo, status_code=status.HTTP_201_CREATED)
 async def register_agent(
     request: AgentRegistrationRequest,
-    db: AsyncSession = Depends(get_db_session),
 ) -> AgentInfo:
     """
     Register a new agent in the A2A network.
 
-    Returns the registered agent info with a generated API key.
-    Store the API key securely - it won't be retrievable later.
+    The caller provides its own API key (min 32 chars) in the request body;
+    only its hash is stored. Keep the key you submitted — it is not returned.
     """
     registry = get_agent_registry()
 
     try:
-        agent_info, api_key = await registry.register_agent(
+        agent_info = await registry.register_agent(
             agent_id=request.agent_id,
             name=request.name,
-            url=request.url,
+            url=str(request.url),
             capabilities=request.capabilities,
-            webhook_url=request.webhook_url,
+            api_key=request.api_key,
+            webhook_url=str(request.webhook_url) if request.webhook_url else None,
             version=request.version,
             metadata=request.metadata,
-            db=db,
         )
 
         logger.info(
@@ -96,14 +94,7 @@ async def register_agent(
             capabilities_count=len(agent_info.capabilities),
         )
 
-        # Include API key in response (only returned once)
-        response_data = agent_info.model_dump()
-        response_data["api_key"] = api_key  # Only shown during registration
-
-        return JSONResponse(
-            content=response_data,
-            status_code=status.HTTP_201_CREATED,
-        )
+        return agent_info
 
     except A2ARegistrationError as e:
         logger.error("a2a_registration_failed", error=str(e))
@@ -117,7 +108,6 @@ async def register_agent(
 async def list_agents(
     status_filter: AgentStatus | None = None,
     capability: str | None = None,
-    db: AsyncSession = Depends(get_db_session),
 ) -> list[AgentInfo]:
     """
     List all registered agents.
@@ -132,9 +122,8 @@ async def list_agents(
     registry = get_agent_registry()
 
     agents = await registry.list_agents(
-        status=status_filter,
-        capability=capability,
-        db=db,
+        status_filter=status_filter,
+        capability_filter=capability,
     )
 
     logger.debug(
@@ -150,7 +139,6 @@ async def list_agents(
 @router.get("/agents/{agent_id}", response_model=AgentInfo)
 async def get_agent_info(
     agent_id: str = Path(..., description="Agent identifier"),
-    db: AsyncSession = Depends(get_db_session),
 ) -> AgentInfo:
     """
     Get information about a specific agent.
@@ -166,7 +154,7 @@ async def get_agent_info(
     """
     registry = get_agent_registry()
 
-    agent = await registry.get_agent(agent_id=agent_id, db=db)
+    agent = await registry.get_agent(agent_id=agent_id)
 
     if not agent:
         raise HTTPException(
@@ -181,7 +169,6 @@ async def get_agent_info(
 async def deregister_agent(
     agent_id: str = Path(..., description="Agent identifier"),
     caller_agent_id: str = Depends(verify_a2a_auth),
-    db: AsyncSession = Depends(get_db_session),
 ) -> None:
     """
     Deregister an agent.
@@ -203,7 +190,7 @@ async def deregister_agent(
         )
 
     registry = get_agent_registry()
-    success = await registry.deregister_agent(agent_id=agent_id, db=db)
+    success = await registry.deregister_agent(agent_id=agent_id)
 
     if not success:
         raise HTTPException(
@@ -238,23 +225,24 @@ async def delegate_task(
     registry = get_agent_registry()
 
     # Find matching capability
-    agents = await registry.find_agents_by_capability(
-        capability=request.capability,
-        db=db,
+    matches = await registry.find_agents_by_capability(
+        capability_name=request.capability,
     )
 
-    if not agents:
+    if not matches:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"No agents found with capability: {request.capability}",
         )
+
+    best_match = matches[0][0]  # Use best match (highest score)
 
     # Create task record
     task_id = str(uuid.uuid4())
     task = AgentTask(
         task_id=task_id,
         from_agent_id=caller_agent_id,
-        to_agent_id=agents[0].agent_id,  # Use best match
+        to_agent_id=best_match.agent_id,
         capability=request.capability,
         parameters=request.parameters,
         context=request.context or {},
@@ -273,7 +261,7 @@ async def delegate_task(
     message = AgentMessage(
         message_id=str(uuid.uuid4()),
         from_agent_id=caller_agent_id,
-        to_agent_id=agents[0].agent_id,
+        to_agent_id=best_match.agent_id,
         task_id=task_id,
         message_type="task_delegation",
         payload=request.model_dump(mode="json"),
@@ -287,7 +275,7 @@ async def delegate_task(
         "a2a_task_delegated",
         task_id=task_id,
         from_agent=caller_agent_id,
-        to_agent=agents[0].agent_id,
+        to_agent=best_match.agent_id,
         capability=request.capability,
         async_mode=request.async_mode,
     )
@@ -297,7 +285,7 @@ async def delegate_task(
     return TaskDelegationResponse(
         task_id=task_id,
         status=TaskStatus.QUEUED,
-        message=f"Task queued for execution by {agents[0].name}",
+        message=f"Task queued for execution by {best_match.name}",
     )
 
 
@@ -376,11 +364,8 @@ async def receive_webhook(
         task.status = payload.status.value
         task.result = payload.result
         task.error = payload.error
-        task.completed_at = payload.completed_at or datetime.now(UTC)
-
-        if task.started_at and task.completed_at:
-            duration = (task.completed_at - task.started_at).total_seconds()
-            task.duration_seconds = duration
+        task.completed_at = datetime.now(UTC)
+        task.duration_seconds = payload.duration_seconds
 
         await db.commit()
 

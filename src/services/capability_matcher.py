@@ -37,8 +37,8 @@ def match_capability(
         # Exact name match
         if capability.name == required_capability:
             # Validate parameters if schema provided
-            if capability.parameters_schema:
-                if _validate_parameters(parameters, capability.parameters_schema):
+            if capability.parameters:
+                if _validate_parameters(parameters, capability.parameters):
                     return 1.0  # Perfect match with valid params
                 else:
                     best_score = max(best_score, 0.8)  # Match but params invalid
@@ -121,7 +121,7 @@ def _check_type(value: Any, expected_type: str) -> bool:
     Returns:
         True if value matches type, False otherwise
     """
-    type_map = {
+    type_map: dict[str, type | tuple[type, ...]] = {
         "string": str,
         "number": (int, float),
         "integer": int,

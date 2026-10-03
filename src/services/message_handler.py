@@ -4,6 +4,7 @@ import asyncio
 import re
 import uuid
 from datetime import UTC
+from typing import Any
 
 import structlog
 
@@ -106,165 +107,6 @@ class MessageHandler:
         self.platform_handler = PlatformHandler()  # Platform operations handler
         self.azure_handler = AzureHandler()  # Azure ARM operations handler (SPEC-002)
         logger.info("message_handler_initialized")
-
-    def _format_kubectl_table(self, output: str, resource_type: str = "pods") -> str:
-        """
-        Format kubectl table output for better readability in chat.
-
-        Args:
-            output: Raw kubectl output
-            resource_type: Type of resource (pods, nodes, deployments, etc.)
-
-        Returns:
-            Formatted string for chat display
-        """
-        lines = output.strip().split("\n")
-        if len(lines) <= 1:
-            return output
-
-        # Parse header and rows
-        header_line = lines[0]
-        data_lines = lines[1:]
-
-        # For pods, show key information in a compact format
-        if resource_type == "pods":
-            formatted = []
-            # Detect --all-namespaces output: first column header is NAMESPACE
-            has_ns_col = header_line.strip().upper().startswith("NAMESPACE")
-            for line in data_lines:
-                parts = line.split()
-                min_cols = 6 if has_ns_col else 5
-                if len(parts) >= min_cols:
-                    if has_ns_col:
-                        ns = parts[0]
-                        name = parts[1]
-                        ready = parts[2]
-                        status = parts[3]
-                        restarts = parts[4]
-                        age = parts[5]
-                    else:
-                        ns = None
-                        name = parts[0]
-                        ready = parts[1]
-                        status = parts[2]
-                        restarts = parts[3]
-                        age = parts[4]
-
-                    # Status emoji
-                    status_emoji = "✅" if status == "Running" and "/" in ready else "⚠️"
-                    if status in ["CrashLoopBackOff", "Error", "ImagePullBackOff", "ErrImagePull"]:
-                        status_emoji = "❌"
-                    elif status in ["Pending", "ContainerCreating"]:
-                        status_emoji = "⏳"
-                    elif status == "Completed":
-                        status_emoji = "✔️"
-                    elif status == "OOMKilled":
-                        status_emoji = "💥"
-
-                    name_label = f"`{ns}/{name}`" if ns else f"**{name}**"
-                    formatted.append(
-                        f"{status_emoji} {name_label}\n"
-                        f"   Status: {status} | Ready: {ready} | Restarts: {restarts} | Age: {age}"
-                    )
-
-            return "\n\n".join(formatted) if formatted else "No resources found"
-
-        # For nodes, show compact format
-        elif resource_type == "nodes":
-            formatted = []
-            for line in data_lines:
-                parts = line.split()
-                if len(parts) >= 5:
-                    name = parts[0]
-                    status = parts[1]
-                    roles = parts[2]
-                    age = parts[3]
-                    version = parts[4]
-
-                    status_emoji = "✅" if status == "Ready" else "❌"
-                    formatted.append(
-                        f"{status_emoji} **{name}**\n   Status: {status} | Role: {roles} | Version: {version} | Age: {age}"
-                    )
-
-            return "\n\n".join(formatted) if formatted else "No nodes found"
-
-        # For deployments, show compact format
-        elif resource_type == "deployments":
-            formatted = []
-            for line in data_lines:
-                parts = line.split()
-                if len(parts) >= 4:
-                    name = parts[0]
-                    ready = parts[1]
-                    up_to_date = parts[2]
-                    available = parts[3]
-                    age = parts[4] if len(parts) > 4 else "N/A"
-
-                    # Check if deployment is healthy
-                    status_emoji = "✅" if "/" in ready else "⚠️"
-                    try:
-                        current, desired = ready.split("/")
-                        if current != desired:
-                            status_emoji = "⚠️"
-                    except Exception:
-                        pass
-
-                    formatted.append(
-                        f"{status_emoji} **{name}**\n   Ready: {ready} | Up-to-date: {up_to_date} | Available: {available} | Age: {age}"
-                    )
-
-            return "\n\n".join(formatted) if formatted else "No deployments found"
-
-        # For services and other resources, use table format but truncate
-        else:
-            # Keep header and limit column widths
-            formatted = [f"```\n{header_line}"]
-            for line in data_lines[:20]:  # Limit to 20 rows
-                formatted.append(line)
-
-            if len(data_lines) > 20:
-                formatted.append(f"... and {len(data_lines) - 20} more")
-
-            formatted.append("```")
-            return "\n".join(formatted)
-
-    async def _run_kubectl_command(self, args: list[str]) -> tuple[bool, str]:
-        """
-        Run a kubectl command and return the output.
-
-        Args:
-            args: kubectl command arguments (without 'kubectl' prefix)
-
-        Returns:
-            Tuple of (success, output)
-        """
-        try:
-            cmd = ["kubectl"] + args
-            logger.info("running_kubectl", command=" ".join(cmd))
-
-            process = await asyncio.create_subprocess_exec(
-                *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-            )
-
-            stdout, stderr = await process.communicate()
-
-            if process.returncode == 0:
-                output = stdout.decode("utf-8").strip()
-                return True, output
-            else:
-                error = stderr.decode("utf-8").strip()
-                logger.error("kubectl_command_failed", error=error, returncode=process.returncode)
-                return False, error
-
-        except FileNotFoundError:
-            logger.error("kubectl_not_found")
-            return (
-                False,
-                "kubectl command not found. Please ensure kubectl is installed and in your PATH.",
-            )
-        except Exception as e:
-            logger.error("kubectl_command_error", error=str(e))
-            return False, f"Error executing kubectl command: {str(e)}"
 
     def _format_kubectl_table(self, output: str, resource_type: str = "pods") -> str:
         """
@@ -1169,7 +1011,7 @@ class MessageHandler:
 
                     if vms:
                         # Group by platform
-                        by_platform = {}
+                        by_platform: dict[str, list[dict[str, Any]]] = {}
                         for vm in vms:
                             platform = vm.get("platform", "unknown")
                             if platform not in by_platform:
@@ -2071,12 +1913,10 @@ Note: Kubernetes MCP tools are integrated. You can manage your cluster directly 
 
             elif args[0] == "agents":
                 capability_filter = args[1] if len(args) > 1 else None
-                from src.database import get_db_session
                 from src.services.agent_registry import get_agent_registry
 
                 registry = get_agent_registry()
-                async with get_db_session() as db:
-                    agents = await registry.list_agents(capability=capability_filter, db=db)
+                agents = await registry.list_agents(capability_filter=capability_filter)
 
                 if not agents:
                     return (
@@ -2109,27 +1949,35 @@ Note: Kubernetes MCP tools are integrated. You can manage your cluster directly 
 
             elif args[0] == "agent" and len(args) > 1:
                 agent_id = args[1]
-                from src.database import get_db_session
                 from src.services.agent_registry import get_agent_registry
 
                 registry = get_agent_registry()
-                async with get_db_session() as db:
-                    agent = await registry.get_agent(agent_id=agent_id, db=db)
+                agent_info = await registry.get_agent(agent_id=agent_id)
 
-                if not agent:
+                if not agent_info:
                     return f"❌ Agent not found: `{agent_id}`"
 
+                registered_at = (
+                    agent_info.registered_at.strftime("%Y-%m-%d %H:%M")
+                    if agent_info.registered_at
+                    else "unknown"
+                )
+                last_seen = (
+                    agent_info.last_seen.strftime("%Y-%m-%d %H:%M")
+                    if agent_info.last_seen
+                    else "unknown"
+                )
                 lines = [
-                    f"🤖 **{agent.name}**\n",
-                    f"**Agent ID:** `{agent.agent_id}`",
-                    f"**URL:** {agent.url}",
-                    f"**Status:** {agent.status.value if hasattr(agent.status, 'value') else agent.status}",
-                    f"**Version:** {agent.version}",
-                    f"**Registered:** {agent.registered_at.strftime('%Y-%m-%d %H:%M')}",
-                    f"**Last Seen:** {agent.last_seen.strftime('%Y-%m-%d %H:%M')}",
-                    f"\n**Capabilities ({len(agent.capabilities)}):**\n",
+                    f"🤖 **{agent_info.name}**\n",
+                    f"**Agent ID:** `{agent_info.agent_id}`",
+                    f"**URL:** {agent_info.url}",
+                    f"**Status:** {agent_info.status.value if hasattr(agent_info.status, 'value') else agent_info.status}",
+                    f"**Version:** {agent_info.version}",
+                    f"**Registered:** {registered_at}",
+                    f"**Last Seen:** {last_seen}",
+                    f"\n**Capabilities ({len(agent_info.capabilities)}):**\n",
                 ]
-                for cap in agent.capabilities:
+                for cap in agent_info.capabilities:
                     lines.append(f"• `{cap.name}` - {cap.description}")
                     if cap.tags:
                         lines.append(f"  Tags: {', '.join(cap.tags)}")

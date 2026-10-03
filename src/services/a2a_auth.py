@@ -3,7 +3,7 @@
 import hashlib
 import secrets
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 import jwt
 import structlog
@@ -120,7 +120,7 @@ class A2AAuth:
                 algorithms=[self.algorithm],
                 options={"verify_exp": True},
             )
-            return payload
+            return cast(dict[str, Any], payload)
         except jwt.ExpiredSignatureError as e:
             raise A2AAuthenticationError("Token has expired") from e
         except jwt.InvalidTokenError as e:
@@ -145,7 +145,7 @@ class A2AAuth:
                 token,
                 options={"verify_signature": False, "verify_exp": False},
             )
-            return payload.get("sub", "")
+            return str(payload.get("sub", ""))
         except Exception as e:
             raise A2AAuthenticationError(f"Failed to extract agent ID: {e}") from e
 
@@ -194,7 +194,7 @@ class A2AAuth:
                 )
 
         logger.debug("a2a_auth_success", agent_id=agent_id)
-        return agent_id
+        return str(agent_id)
 
 
 # Global auth instance

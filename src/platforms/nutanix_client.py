@@ -47,6 +47,12 @@ class NutanixClient(BasePlatformClient):
         self._client: httpx.AsyncClient | None = None
         self._base_url = f"{config.endpoint.rstrip('/')}/api/nutanix/v3"
 
+    @property
+    def _http(self) -> httpx.AsyncClient:
+        """Typed accessor for the HTTP client — call initialize() first."""
+        assert self._client is not None, "NutanixClient.initialize() must be called first"
+        return self._client
+
     async def initialize(self) -> None:
         """Initialize HTTP client and validate connection."""
         if self._initialized:
@@ -104,7 +110,7 @@ class NutanixClient(BasePlatformClient):
                     message="Client not initialized",
                 )
 
-            response = await self._client.get("/clusters/list", json={"kind": "cluster"})
+            response = await self._http.post("/clusters/list", json={"kind": "cluster"})
             response_time = (time.time() - start_time) * 1000
 
             if response.status_code == 200:
@@ -155,7 +161,7 @@ class NutanixClient(BasePlatformClient):
                 payload["filter"] = filters.get("filter", "")
 
         try:
-            response = await self._client.post("/vms/list", json=payload)
+            response = await self._http.post("/vms/list", json=payload)
             response.raise_for_status()
             data = response.json()
 
@@ -229,7 +235,7 @@ class NutanixClient(BasePlatformClient):
             raise RuntimeError("Client not initialized. Call initialize() first.")
 
         try:
-            response = await self._client.get(f"/vms/{vm_id}")
+            response = await self._http.get(f"/vms/{vm_id}")
             response.raise_for_status()
             entity = response.json()
 
@@ -302,7 +308,7 @@ class NutanixClient(BasePlatformClient):
             # Update power state to ON
             payload = {"spec": {"resources": {"power_state": "ON"}}}
 
-            response = await self._client.put(f"/vms/{vm_id}", json=payload)
+            response = await self._http.put(f"/vms/{vm_id}", json=payload)
             response.raise_for_status()
 
             self.logger.info("vm_started", vm_id=vm_id, vm_name=vm.name)
@@ -330,7 +336,7 @@ class NutanixClient(BasePlatformClient):
             # The force parameter is provided for interface compatibility
             payload = {"spec": {"resources": {"power_state": "OFF"}}}
 
-            response = await self._client.put(f"/vms/{vm_id}", json=payload)
+            response = await self._http.put(f"/vms/{vm_id}", json=payload)
             response.raise_for_status()
 
             self.logger.info("vm_stopped", vm_id=vm_id, vm_name=vm.name, force=force)
@@ -373,7 +379,7 @@ class NutanixClient(BasePlatformClient):
             payload["filter"] = f"cluster_name=={cluster}"
 
         try:
-            response = await self._client.post("/hosts/list", json=payload)
+            response = await self._http.post("/hosts/list", json=payload)
             response.raise_for_status()
             data = response.json()
 
@@ -437,7 +443,7 @@ class NutanixClient(BasePlatformClient):
             raise RuntimeError("Client not initialized. Call initialize() first.")
 
         try:
-            response = await self._client.get(f"/hosts/{host_id}")
+            response = await self._http.get(f"/hosts/{host_id}")
             response.raise_for_status()
             entity = response.json()
 
@@ -492,7 +498,7 @@ class NutanixClient(BasePlatformClient):
             raise RuntimeError("Client not initialized. Call initialize() first.")
 
         try:
-            response = await self._client.post("/clusters/list", json={"kind": "cluster"})
+            response = await self._http.post("/clusters/list", json={"kind": "cluster"})
             response.raise_for_status()
             data = response.json()
 

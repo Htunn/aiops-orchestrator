@@ -153,10 +153,10 @@ class ApiBackendWatchLoop:
         """Get current status of monitored endpoints."""
         if endpoint_name:
             return (
-                {endpoint_name: self._status.get(endpoint_name)}
+                {endpoint_name: self._status[endpoint_name]}
                 if endpoint_name in self._status
                 else {}
-            )  # type: ignore
+            )
         return self._status.copy()
 
     async def _monitor_backend(self, backend: ApiBackendConfig) -> None:

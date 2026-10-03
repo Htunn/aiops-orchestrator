@@ -38,7 +38,7 @@ class PlatformConfig:
     max_retries: int = 3
     extra: dict[str, Any] | None = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate configuration."""
         if not self.endpoint:
             raise ValueError("Platform endpoint is required")
@@ -289,12 +289,17 @@ class BasePlatformClient(ABC):
 
     # Context Manager Support
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "BasePlatformClient":
         """Async context manager entry."""
         await self.initialize()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: Any,
+    ) -> bool:
         """Async context manager exit."""
         await self.close()
         return False

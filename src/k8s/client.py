@@ -143,7 +143,7 @@ class KubernetesClient:
     def _read_proxy_url(kubeconfig_path: str, context_name: str | None) -> str | None:
         """Extract proxy-url for the active context's cluster from a kubeconfig file."""
         try:
-            import yaml  # type: ignore[import-untyped]
+            import yaml
 
             with open(kubeconfig_path) as f:
                 kc = yaml.safe_load(f)

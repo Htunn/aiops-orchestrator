@@ -20,7 +20,7 @@ class TestCapabilityMatcher:
             AgentCapability(
                 name="kubernetes.scale",
                 description="Scale Kubernetes deployments",
-                parameters_schema={
+                parameters={
                     "type": "object",
                     "required": ["namespace", "deployment", "replicas"],
                     "properties": {
@@ -34,7 +34,7 @@ class TestCapabilityMatcher:
             AgentCapability(
                 name="kubernetes.restart",
                 description="Restart Kubernetes pods",
-                parameters_schema={
+                parameters={
                     "type": "object",
                     "required": ["namespace", "deployment"],
                     "properties": {
@@ -47,7 +47,7 @@ class TestCapabilityMatcher:
             AgentCapability(
                 name="database.query",
                 description="Query database",
-                parameters_schema={
+                parameters={
                     "type": "object",
                     "required": ["database", "query"],
                     "properties": {
@@ -178,7 +178,7 @@ class TestCapabilityMatcher:
                     {
                         "name": "kubernetes.scale",
                         "description": "Scale deployments",
-                        "parameters_schema": {
+                        "parameters": {
                             "type": "object",
                             "required": ["namespace", "deployment", "replicas"],
                             "properties": {

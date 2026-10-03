@@ -54,6 +54,12 @@ class OpenShiftClient(BasePlatformClient):
         self._k8s_client: KubernetesClient | None = None
         self._base_url = config.endpoint.rstrip("/")
 
+    @property
+    def _http(self) -> httpx.AsyncClient:
+        """Typed accessor for the HTTP client — call initialize() first."""
+        assert self._client is not None, "OpenShiftClient.initialize() must be called first"
+        return self._client
+
     async def initialize(self) -> None:
         """Initialize HTTP client and validate connection."""
         if self._initialized:
@@ -115,7 +121,7 @@ class OpenShiftClient(BasePlatformClient):
                 )
 
             # Check OpenShift API health endpoint
-            response = await self._client.get("/healthz")
+            response = await self._http.get("/healthz")
             response_time = (time.time() - start_time) * 1000
 
             if response.status_code == 200:
@@ -155,7 +161,7 @@ class OpenShiftClient(BasePlatformClient):
             raise RuntimeError("Client not initialized. Call initialize() first.")
 
         try:
-            response = await self._client.get("/apis/project.openshift.io/v1/projects")
+            response = await self._http.get("/apis/project.openshift.io/v1/projects")
             response.raise_for_status()
             data = response.json()
 
@@ -196,7 +202,7 @@ class OpenShiftClient(BasePlatformClient):
             raise RuntimeError("Client not initialized. Call initialize() first.")
 
         try:
-            response = await self._client.get(f"/apis/project.openshift.io/v1/projects/{name}")
+            response = await self._http.get(f"/apis/project.openshift.io/v1/projects/{name}")
             response.raise_for_status()
             item = response.json()
 
@@ -235,7 +241,7 @@ class OpenShiftClient(BasePlatformClient):
             raise RuntimeError("Client not initialized. Call initialize() first.")
 
         try:
-            response = await self._client.get(
+            response = await self._http.get(
                 f"/apis/route.openshift.io/v1/namespaces/{namespace}/routes"
             )
             response.raise_for_status()
@@ -286,7 +292,7 @@ class OpenShiftClient(BasePlatformClient):
             raise RuntimeError("Client not initialized. Call initialize() first.")
 
         try:
-            response = await self._client.get(
+            response = await self._http.get(
                 f"/apis/build.openshift.io/v1/namespaces/{namespace}/buildconfigs"
             )
             response.raise_for_status()
@@ -336,7 +342,7 @@ class OpenShiftClient(BasePlatformClient):
             if buildconfig:
                 params["labelSelector"] = f"buildconfig={buildconfig}"
 
-            response = await self._client.get(url, params=params)
+            response = await self._http.get(url, params=params)
             response.raise_for_status()
             data = response.json()
 
@@ -380,7 +386,7 @@ class OpenShiftClient(BasePlatformClient):
             raise RuntimeError("Client not initialized. Call initialize() first.")
 
         try:
-            response = await self._client.get(
+            response = await self._http.get(
                 f"/apis/image.openshift.io/v1/namespaces/{namespace}/imagestreams"
             )
             response.raise_for_status()
@@ -471,7 +477,7 @@ class OpenShiftClient(BasePlatformClient):
             raise RuntimeError("Client not initialized. Call initialize() first.")
 
         try:
-            response = await self._client.get("/api/v1/nodes")
+            response = await self._http.get("/api/v1/nodes")
             response.raise_for_status()
             data = response.json()
 
@@ -526,7 +532,7 @@ class OpenShiftClient(BasePlatformClient):
             raise RuntimeError("Client not initialized. Call initialize() first.")
 
         try:
-            response = await self._client.get(f"/api/v1/nodes/{host_id}")
+            response = await self._http.get(f"/api/v1/nodes/{host_id}")
             response.raise_for_status()
             item = response.json()
 

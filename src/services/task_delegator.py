@@ -34,7 +34,7 @@ class TaskDelegator:
     - Manage timeouts and retries
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.client = get_a2a_client()
         self.registry = get_agent_registry()
 
@@ -103,16 +103,16 @@ class TaskDelegator:
     ) -> TaskDelegationResponse | TaskStatusResponse:
         """Internal delegation logic with database session."""
         # Find agents with the required capability
-        agents = await self.registry.find_agents_by_capability(
-            capability=capability,
-            db=db,
+        matches = await self.registry.find_agents_by_capability(
+            capability_name=capability,
         )
 
-        if not agents:
+        if not matches:
             raise A2ACapabilityNotFoundError(f"No agents found with capability: {capability}")
 
         # Select best agent using capability matcher
-        selected_agent = await self._select_best_agent(agents, capability, parameters)
+        candidates = [agent for agent, _score in matches]
+        selected_agent = await self._select_best_agent(candidates, capability, parameters)
 
         logger.info(
             "a2a_delegating_task",
@@ -134,7 +134,7 @@ class TaskDelegator:
         # Delegate to the selected agent
         try:
             response = await self.client.delegate_task(
-                agent_url=selected_agent.url,
+                agent_url=str(selected_agent.url),
                 agent_id=selected_agent.agent_id,
                 request=request,
                 api_key=selected_agent.api_key_hash,  # Will be used for auth
@@ -166,7 +166,7 @@ class TaskDelegator:
                 )
 
                 final_status = await self.client.wait_for_task_completion(
-                    agent_url=selected_agent.url,
+                    agent_url=str(selected_agent.url),
                     task_id=response.task_id,
                     api_key=selected_agent.api_key_hash,
                     max_wait_seconds=timeout_seconds,

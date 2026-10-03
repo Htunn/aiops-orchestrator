@@ -16,6 +16,7 @@ Environment variable format:
 """
 
 import asyncio
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -59,7 +60,7 @@ class PlatformRegistry:
         await registry.close_all()
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize platform registry."""
         self._clients: dict[str, BasePlatformClient] = {}
         self._configs: dict[str, PlatformConfigModel] = {}
@@ -361,7 +362,9 @@ class PlatformRegistry:
         async with get_db_session() as session:
             # Update platform config
             config.health_status = health.status
-            config.last_health_check = health.last_check
+            config.last_health_check = (
+                datetime.fromisoformat(health.last_check) if health.last_check else None
+            )
             session.add(config)
 
             # Store history

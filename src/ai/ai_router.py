@@ -200,13 +200,14 @@ class AIRouter(BaseAIClient):
         # Strip provider prefix if present
         actual_model = self._strip_provider_prefix(model)
         backend = self._backend_for(model)
-        return backend.stream_response(
+        async for chunk in backend.stream_response(
             messages=messages,
             model=actual_model,
             temperature=temperature,
             max_tokens=max_tokens,
             **kwargs,
-        )
+        ):
+            yield chunk
 
     def is_model_supported(self, model: str) -> bool:
         actual_model = self._strip_provider_prefix(model)

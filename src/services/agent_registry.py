@@ -59,11 +59,11 @@ class AgentRegistry:
         agent_info = AgentInfo(
             agent_id=agent_id,
             name=name,
-            url=url,  # type: ignore
+            url=url,
             capabilities=capabilities,
             status=AgentStatus.ONLINE,
             api_key_hash=api_key_hash,
-            webhook_url=webhook_url,  # type: ignore
+            webhook_url=webhook_url,
             version=version,
             metadata=metadata or {},
             registered_at=datetime.now(UTC),
@@ -256,7 +256,7 @@ class AgentRegistry:
             )
             await session.commit()
 
-            if result.rowcount == 0:  # type: ignore
+            if result.rowcount == 0:
                 return False
 
         # Invalidate cache

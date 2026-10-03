@@ -6,7 +6,7 @@ AIRouter can dispatch to either backend without any changes to callers.
 """
 
 from collections.abc import AsyncGenerator
-from typing import Any
+from typing import Any, cast
 
 import structlog
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -128,7 +128,7 @@ class GeminiClient(BaseAIClient):
                 ),
             )
 
-            chat = genai_model.start_chat(history=chat_history)
+            chat = genai_model.start_chat(history=cast(Any, chat_history))
             response = await chat.send_message_async(last_user_text)
 
             content: str = response.text or ""
@@ -185,7 +185,7 @@ class GeminiClient(BaseAIClient):
                     max_output_tokens=max_tokens,
                 ),
             )
-            chat = genai_model.start_chat(history=chat_history)
+            chat = genai_model.start_chat(history=cast(Any, chat_history))
             response = await chat.send_message_async(last_user_text, stream=True)
 
             async for chunk in response:

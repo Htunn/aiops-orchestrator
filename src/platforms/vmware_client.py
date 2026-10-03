@@ -48,6 +48,12 @@ class VMwareClient(BasePlatformClient):
         self._session_id: str | None = None
         self._base_url = f"{config.endpoint.rstrip('/')}/rest"
 
+    @property
+    def _http(self) -> httpx.AsyncClient:
+        """Typed accessor for the HTTP client — call initialize() first."""
+        assert self._client is not None, "VMwareClient.initialize() must be called first"
+        return self._client
+
     async def initialize(self) -> None:
         """Initialize HTTP client and create vCenter session."""
         if self._initialized:
@@ -87,7 +93,7 @@ class VMwareClient(BasePlatformClient):
         try:
             # vCenter REST API uses HTTP Basic Auth to create sessions
             auth = httpx.BasicAuth(self.config.username, self.config.password)
-            response = await self._client.post("/com/vmware/cis/session", auth=auth)
+            response = await self._http.post("/com/vmware/cis/session", auth=auth)
             response.raise_for_status()
 
             # Extract session ID from response
@@ -113,7 +119,7 @@ class VMwareClient(BasePlatformClient):
             return
 
         try:
-            await self._client.delete("/com/vmware/cis/session")
+            await self._http.delete("/com/vmware/cis/session")
             self.logger.info("vcenter_session_deleted")
         except Exception as e:
             self.logger.warning("vcenter_session_delete_failed", error=str(e))
@@ -145,7 +151,7 @@ class VMwareClient(BasePlatformClient):
                 )
 
             # Check session validity by listing VMs (quick operation)
-            response = await self._client.get("/vcenter/vm")
+            response = await self._http.get("/vcenter/vm")
             response_time = (time.time() - start_time) * 1000
 
             if response.status_code == 200:
@@ -190,7 +196,7 @@ class VMwareClient(BasePlatformClient):
             if filters:
                 params.update(filters)
 
-            response = await self._client.get("/vcenter/vm", params=params)
+            response = await self._http.get("/vcenter/vm", params=params)
             response.raise_for_status()
             data = response.json()
 
@@ -199,7 +205,7 @@ class VMwareClient(BasePlatformClient):
                 vm_id = vm_summary.get("vm")
 
                 # Get detailed VM info
-                detail_response = await self._client.get(f"/vcenter/vm/{vm_id}")
+                detail_response = await self._http.get(f"/vcenter/vm/{vm_id}")
                 detail_response.raise_for_status()
                 vm_detail = detail_response.json().get("value", {})
 
@@ -260,7 +266,7 @@ class VMwareClient(BasePlatformClient):
             raise RuntimeError("Client not initialized. Call initialize() first.")
 
         try:
-            response = await self._client.get(f"/vcenter/vm/{vm_id}")
+            response = await self._http.get(f"/vcenter/vm/{vm_id}")
             response.raise_for_status()
             vm_detail = response.json().get("value", {})
 
@@ -324,7 +330,7 @@ class VMwareClient(BasePlatformClient):
                 return True
 
             # Power on the VM
-            response = await self._client.post(f"/vcenter/vm/{vm_id}/power/start")
+            response = await self._http.post(f"/vcenter/vm/{vm_id}/power/start")
             response.raise_for_status()
 
             self.logger.info("vm_started", vm_id=vm_id, vm_name=vm.name)
@@ -351,7 +357,7 @@ class VMwareClient(BasePlatformClient):
             endpoint = (
                 f"/vcenter/vm/{vm_id}/power/stop" if force else f"/vcenter/vm/{vm_id}/power/stop"
             )
-            response = await self._client.post(endpoint)
+            response = await self._http.post(endpoint)
             response.raise_for_status()
 
             self.logger.info("vm_stopped", vm_id=vm_id, vm_name=vm.name, force=force)
@@ -371,7 +377,7 @@ class VMwareClient(BasePlatformClient):
 
             # Use vCenter's reset operation if VM is running
             if vm.is_running():
-                response = await self._client.post(f"/vcenter/vm/{vm_id}/power/reset")
+                response = await self._http.post(f"/vcenter/vm/{vm_id}/power/reset")
                 response.raise_for_status()
             else:
                 # If stopped, just start it
@@ -394,7 +400,7 @@ class VMwareClient(BasePlatformClient):
             if cluster:
                 params["filter.clusters"] = cluster
 
-            response = await self._client.get("/vcenter/host", params=params)
+            response = await self._http.get("/vcenter/host", params=params)
             response.raise_for_status()
             data = response.json()
 
@@ -444,7 +450,7 @@ class VMwareClient(BasePlatformClient):
             raise RuntimeError("Client not initialized. Call initialize() first.")
 
         try:
-            response = await self._client.get(f"/vcenter/host/{host_id}")
+            response = await self._http.get(f"/vcenter/host/{host_id}")
             response.raise_for_status()
             host_detail = response.json().get("value", {})
 
@@ -487,7 +493,7 @@ class VMwareClient(BasePlatformClient):
             raise RuntimeError("Client not initialized. Call initialize() first.")
 
         try:
-            response = await self._client.get("/vcenter/cluster")
+            response = await self._http.get("/vcenter/cluster")
             response.raise_for_status()
             data = response.json()
 

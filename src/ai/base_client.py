@@ -49,6 +49,8 @@ class BaseAIClient(ABC):
         Yields:
             Successive text fragments of the response.
         """
+        raise NotImplementedError
+        yield  # pragma: no cover — unreachable; marks this as an async generator for type checkers
 
     @abstractmethod
     def is_model_supported(self, model: str) -> bool:
