@@ -7,10 +7,10 @@ different cloud and virtualization platforms (Nutanix, VMware, OpenShift).
 
 from .base_client import (
     BasePlatformClient,
+    HostResource,
+    PlatformConfig,
     PlatformHealth,
     PlatformType,
-    PlatformConfig,
-    HostResource,
     VMResource,
 )
 from .nutanix_client import NutanixClient

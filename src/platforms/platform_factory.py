@@ -5,8 +5,6 @@ Provides factory methods to create platform clients based on configuration.
 Supports dynamic client instantiation and platform type detection.
 """
 
-from typing import Type
-
 import structlog
 
 from .base_client import BasePlatformClient, PlatformConfig, PlatformType
@@ -38,7 +36,7 @@ class PlatformFactory:
     """
 
     # Registry of platform types to client classes
-    _registry: dict[PlatformType, Type[BasePlatformClient]] = {
+    _registry: dict[PlatformType, type[BasePlatformClient]] = {
         PlatformType.NUTANIX: NutanixClient,
         PlatformType.VMWARE: VMwareClient,
         PlatformType.OPENSHIFT: OpenShiftClient,
@@ -111,7 +109,7 @@ class PlatformFactory:
 
     @classmethod
     def register_platform(
-        cls, platform_type: PlatformType, client_class: Type[BasePlatformClient]
+        cls, platform_type: PlatformType, client_class: type[BasePlatformClient]
     ) -> None:
         """
         Register a custom platform client.

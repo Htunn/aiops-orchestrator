@@ -6,7 +6,6 @@ from typing import Any
 
 import structlog
 from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_db_session
 from src.database.redis import get_redis

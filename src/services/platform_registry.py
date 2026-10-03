@@ -16,13 +16,11 @@ Environment variable format:
 """
 
 import asyncio
-import os
 from typing import Any
 from uuid import UUID
 
 import structlog
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import get_settings
 from src.database import get_db_session
@@ -87,7 +85,7 @@ class PlatformRegistry:
             async with get_db_session() as session:
                 # Load enabled platform configs
                 result = await session.execute(
-                    select(PlatformConfigModel).where(PlatformConfigModel.enabled == True)
+                    select(PlatformConfigModel).where(PlatformConfigModel.enabled)
                 )
                 configs = result.scalars().all()
 

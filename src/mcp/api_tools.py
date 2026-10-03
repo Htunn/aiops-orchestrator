@@ -10,7 +10,6 @@ Provides tools for diagnosing API backend issues:
 
 import asyncio
 import json
-import re
 import socket
 import ssl
 from datetime import UTC, datetime
@@ -187,7 +186,6 @@ class ApiDiagnosticTools:
             context = ssl.create_default_context()
 
             # Connect and get certificate
-            loop = asyncio.get_event_loop()
             reader, writer = await asyncio.open_connection(hostname, port, ssl=context)
 
             # Get peer certificate
@@ -227,7 +225,7 @@ class ApiDiagnosticTools:
                 "message": (
                     f"Valid certificate, expires in {days_until_expiry} days"
                     if is_valid
-                    else f"Certificate invalid or expired"
+                    else "Certificate invalid or expired"
                 ),
             }
 

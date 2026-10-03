@@ -11,7 +11,7 @@ from uuid import UUID
 
 import structlog
 
-from src.platforms import BasePlatformClient, HostResource, VMResource
+from src.platforms import VMResource
 from src.services.platform_registry import get_platform_registry
 
 logger = structlog.get_logger()

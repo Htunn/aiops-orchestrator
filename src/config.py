@@ -271,7 +271,7 @@ def load_api_backend_configs(config_path: str | None = None) -> list[ApiBackendC
         return []
 
     try:
-        with open(config_file, "r", encoding="utf-8") as f:
+        with open(config_file, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         if not data or "api_backends" not in data:
@@ -320,7 +320,7 @@ def load_agents_config(config_path: str | None = None) -> dict[str, Any]:
         return {}
 
     try:
-        with open(config_file, "r", encoding="utf-8") as f:
+        with open(config_file, encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
 
         # Substitute environment variables in agent URLs and API keys
@@ -366,7 +366,7 @@ def load_azure_resources_config(config_path: str | None = None) -> dict[str, Any
         return {}
 
     try:
-        with open(config_file, "r", encoding="utf-8") as f:
+        with open(config_file, encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
 
         def _resolve(value: Any) -> Any:
@@ -395,9 +395,3 @@ def load_azure_resources_config(config_path: str | None = None) -> dict[str, Any
 
     except Exception:
         return {}
-
-
-@lru_cache
-def get_settings() -> Settings:
-    """Get cached settings instance."""
-    return Settings()

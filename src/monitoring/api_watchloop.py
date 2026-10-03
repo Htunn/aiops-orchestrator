@@ -321,7 +321,7 @@ class ApiBackendWatchLoop:
                         issue_key = f"{backend.name}:api_high_error_rate"
                         self._known_issues.pop(issue_key, None)
 
-        except (httpx.TimeoutException, httpx.ConnectTimeout, httpx.ReadTimeout) as e:
+        except (httpx.TimeoutException, httpx.ConnectTimeout, httpx.ReadTimeout):
             # Timeout is treated as a failure
             self._consecutive_failures[backend.name] += 1
             latency_ms = backend.timeout_seconds * 1000
@@ -420,7 +420,7 @@ class ApiBackendWatchLoop:
                             endpoint=event.endpoint_name,
                             error=str(e),
                         )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 continue
             except asyncio.CancelledError:
                 break

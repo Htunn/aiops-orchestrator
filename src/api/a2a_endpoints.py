@@ -2,21 +2,19 @@
 
 import uuid
 from datetime import UTC, datetime
-from typing import Any
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Path, status
 from fastapi.responses import JSONResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.database.models import Agent, AgentMessage, AgentTask
+from src.database.models import AgentMessage, AgentTask
 from src.database.postgres import get_db_session
 from src.exceptions import (
     A2AAuthenticationError,
-    A2ACapabilityNotFoundError,
     A2ARegistrationError,
 )
 from src.models.agent import (
-    AgentHealthResponse,
     AgentInfo,
     AgentRegistrationRequest,
     AgentStatus,
@@ -28,7 +26,6 @@ from src.models.agent import (
 )
 from src.services.a2a_auth import get_a2a_auth
 from src.services.agent_registry import get_agent_registry
-from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/a2a", tags=["A2A"])

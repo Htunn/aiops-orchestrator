@@ -1,7 +1,6 @@
 """A2A Client - HTTP client for calling other AI agents."""
 
 import asyncio
-from typing import Any
 
 import httpx
 import structlog

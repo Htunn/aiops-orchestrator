@@ -15,7 +15,7 @@ import structlog
 logger = structlog.get_logger()
 
 
-class PlatformType(str, Enum):
+class PlatformType(str, Enum):  # noqa: UP042 — StrEnum changes str()/f-string output used in error messages (platform_factory.py, models.py); not a safe mechanical fix
     """Supported platform types."""
 
     KUBERNETES = "kubernetes"

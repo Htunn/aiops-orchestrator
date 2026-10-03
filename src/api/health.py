@@ -311,12 +311,14 @@ async def a2a_health() -> dict[str, Any]:
         return result
 
     try:
-        from src.main import get_agent_registry
-        from src.database.postgres import get_db_session
-        from src.models.agent import AgentStatus
-        from sqlalchemy import select, func
+        from datetime import UTC, datetime, timedelta
+
+        from sqlalchemy import func, select
+
         from src.database.models import AgentTask
-        from datetime import datetime, timedelta, UTC
+        from src.database.postgres import get_db_session
+        from src.main import get_agent_registry
+        from src.models.agent import AgentStatus
 
         registry = get_agent_registry()
         if registry is None:
@@ -336,7 +338,7 @@ async def a2a_health() -> dict[str, Any]:
             for agent in agents:
                 for cap in agent.capabilities:
                     capabilities_set.add(cap.name)
-            result["capabilities"] = sorted(list(capabilities_set))
+            result["capabilities"] = sorted(capabilities_set)
 
             # Count recent delegations (last 24 hours)
             cutoff = datetime.now(UTC) - timedelta(hours=24)

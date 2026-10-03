@@ -6,9 +6,10 @@ and detects degraded or unreachable platforms for proactive alerting.
 """
 
 import asyncio
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any, Callable, Coroutine
+from typing import Any
 
 import structlog
 

@@ -1161,7 +1161,7 @@ class MessageHandler:
                     vms = result.get("vms", [])
                     platforms = result.get("platforms_checked", [])
 
-                    response = f"🖥️ **Virtual Machines**\n\n"
+                    response = "🖥️ **Virtual Machines**\n\n"
                     response += (
                         f"**Summary:** {total} total ({running} running, {stopped} stopped)\n"
                     )
@@ -1204,7 +1204,7 @@ class MessageHandler:
                     hosts = result.get("hosts", [])
                     platforms = result.get("platforms_checked", [])
 
-                    response = f"🖥️ **Hosts/Nodes**\n\n"
+                    response = "🖥️ **Hosts/Nodes**\n\n"
                     response += (
                         f"**Summary:** {total} total ({healthy} healthy, {unhealthy} unhealthy)\n"
                     )
@@ -1425,7 +1425,9 @@ Tokens: {stats["total_tokens"]}"""
                 response = await self._handle_alert_command(command_parts[1:])
 
             elif command == "/a2a":
-                response = await self._handle_a2a_command(args if len(command_parts) > 1 else [])
+                response = await self._handle_a2a_command(
+                    command_parts[1:] if len(command_parts) > 1 else []
+                )
 
             else:
                 response = (

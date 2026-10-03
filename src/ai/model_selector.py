@@ -108,8 +108,8 @@ class ModelSelector:
 
         Accepts GitHub Models aliases and all gemini-* model names.
         """
-        from src.ai.github_models import GitHubModelsClient
         from src.ai.gemini_client import GeminiClient
+        from src.ai.github_models import GitHubModelsClient
 
         github_aliases = set(GitHubModelsClient.SUPPORTED_MODELS.keys())
         gemini_aliases = set(GeminiClient.SUPPORTED_MODELS.keys())

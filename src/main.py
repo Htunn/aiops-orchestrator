@@ -17,7 +17,6 @@ from slowapi.errors import RateLimitExceeded
 import src.monitoring.metrics as _metrics  # noqa: F401 — registers Prometheus metrics on import
 from src.ai import AIRouter
 from src.api import health_router, limiter, set_message_router, webhook_router
-from src.api.a2a_endpoints import router as a2a_router
 from src.api.middleware import ContentSizeLimitMiddleware, CorrelationIdMiddleware
 from src.channels import create_router
 from src.config import get_settings, load_agents_config
