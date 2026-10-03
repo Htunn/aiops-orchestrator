@@ -48,13 +48,18 @@ class LogAnalysisResult:
     summary: str
     raw_errors: list[str]
     ai_classification: str | None = None
+    # Generic domain-agnostic identifier (SPEC-006) — e.g. "nutanix-prod/vm-42",
+    # "prod-rg/web-01". Defaults to pod_name for back-compat K8s callers.
+    source_id: str = ""
 
     def to_markdown(self) -> str:
+        label = self.pod_name
+        scope = f" (ns: `{self.namespace}`)" if self.namespace else ""
         if not self.detected_patterns:
-            return f"✅ No critical patterns detected in logs for `{self.pod_name}` ({self.total_lines} lines analyzed)"
+            return f"✅ No critical patterns detected in logs for `{label}` ({self.total_lines} lines analyzed)"
 
         lines = [
-            f"**📋 Log Analysis: `{self.pod_name}`** (ns: `{self.namespace}`)",
+            f"**📋 Log Analysis: `{label}`**{scope}",
             f"Lines analyzed: {self.total_lines} | Errors: {self.error_count} | Warnings: {self.warning_count}",
             "",
             "**Detected Patterns:**",
@@ -157,13 +162,31 @@ class LogAnalyzer:
         logs: str,
         ai_client: Any = None,
     ) -> LogAnalysisResult:
-        """Analyze log text synchronously (regex only)."""
+        """Analyze log text synchronously (regex only).
+
+        Back-compat Kubernetes-shaped wrapper around `analyze_text()`.
+        """
+        source_id = f"{namespace}/{pod_name}" if namespace else pod_name
+        result = self.analyze_text(source_id, pod_name, logs)
+        result.namespace = namespace
+        return result
+
+    def analyze_text(self, source_id: str, source_label: str, logs: str) -> LogAnalysisResult:
+        """Analyze log-like text from any domain (K8s pod logs, Azure Activity Log
+        entries, VM platform console/health logs) synchronously (regex only).
+
+        Args:
+            source_id: Generic domain-agnostic identifier, e.g. "payments/web-7f9c",
+                "nutanix-prod/vm-42", "prod-rg/web-01".
+            source_label: Short display name shown in markdown output.
+            logs: Raw log/activity-log text to scan.
+        """
         settings = get_settings()
         max_bytes = getattr(settings, "max_log_bytes", _DEFAULT_MAX_LOG_BYTES)
         if len(logs.encode("utf-8", errors="replace")) > max_bytes:
             logger.warning(
                 "log_analyzer_oversized_log",
-                pod=pod_name,
+                source=source_id,
                 size_bytes=len(logs),
                 max_bytes=max_bytes,
             )
@@ -200,19 +223,20 @@ class LogAnalyzer:
 
         if detected:
             top = detected[0]
-            summary = f"{top.pattern_name} detected ({top.count}x) in {pod_name} — {total_lines} lines analyzed"
+            summary = f"{top.pattern_name} detected ({top.count}x) in {source_label} — {total_lines} lines analyzed"
         else:
             summary = f"No critical patterns detected in {total_lines} log lines"
 
         return LogAnalysisResult(
-            pod_name=pod_name,
-            namespace=namespace,
+            pod_name=source_label,
+            namespace="",
             total_lines=total_lines,
             error_count=error_count,
             warning_count=warning_count,
             detected_patterns=detected,
             summary=summary,
             raw_errors=list(dict.fromkeys(raw_errors))[:10],
+            source_id=source_id,
         )
 
     async def analyze_with_ai(
@@ -221,9 +245,32 @@ class LogAnalyzer:
         namespace: str,
         logs: str,
         ai_client: Any,
+        context_label: str | None = None,
     ) -> LogAnalysisResult:
         """Analyze logs with regex first, then enrich with AI classification."""
         result = self.analyze(pod_name, namespace, logs)
+        label = context_label or f"Kubernetes pod logs for {namespace}/{pod_name}"
+        return await self._enrich_with_ai(result, logs, ai_client, label)
+
+    async def analyze_text_with_ai(
+        self,
+        source_id: str,
+        source_label: str,
+        logs: str,
+        ai_client: Any,
+        context_label: str | None = None,
+    ) -> LogAnalysisResult:
+        """Domain-agnostic analyze_text() + AI enrichment entrypoint (SPEC-006)."""
+        result = self.analyze_text(source_id, source_label, logs)
+        return await self._enrich_with_ai(result, logs, ai_client, context_label or source_label)
+
+    async def _enrich_with_ai(
+        self,
+        result: LogAnalysisResult,
+        logs: str,
+        ai_client: Any,
+        context_label: str,
+    ) -> LogAnalysisResult:
         if not ai_client:
             return result
 
@@ -233,14 +280,14 @@ class LogAnalyzer:
             log_sample = "\n".join(logs.strip().split("\n")[-30:])
             patterns_found = ", ".join(m.pattern_name for m in result.detected_patterns) or "none"
             prompt = (
-                f"You are an SRE. Analyze these Kubernetes pod logs and provide a 2-3 sentence "
+                f"You are an SRE. Analyze this {context_label} and provide a 2-3 sentence "
                 f"diagnosis. Already detected patterns: {patterns_found}.\n\n"
                 f"Log sample:\n```\n{log_sample}\n```\n\n"
                 f"Provide: failure cause, impact, and immediate remediation suggestion."
             )
-            ai_response = await asyncio.wait_for(
-                ai_client.complete(
-                    user_message=prompt,
+            ai_response, _tokens = await asyncio.wait_for(
+                ai_client.generate_response(
+                    messages=[{"role": "user", "content": prompt}],
                     model="gpt-4o-mini",
                     max_tokens=300,
                 ),
@@ -248,7 +295,7 @@ class LogAnalyzer:
             )
             result.ai_classification = ai_response.strip()
         except TimeoutError:
-            logger.warning("log_ai_analysis_timeout", timeout_seconds=timeout, pod=pod_name)
+            logger.warning("log_ai_analysis_timeout", timeout_seconds=timeout)
         except Exception as e:
             logger.warning("log_ai_analysis_failed", error=str(e))
 

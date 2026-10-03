@@ -44,24 +44,24 @@ class RCAReport:
 
 
 _RCA_SYSTEM_PROMPT = """\
-You are an expert Site Reliability Engineer (SRE) specialized in Kubernetes and cloud-native systems.
-Your task is to perform root cause analysis (RCA) on the provided incident context.
+You are an expert Site Reliability Engineer (SRE) specialized in Kubernetes, cloud infrastructure
+(Azure), and virtualization platforms (Nutanix, VMware, OpenShift).
+Your task is to perform root cause analysis (RCA) on the provided incident context, which may come
+from any of these domains.
 
 Respond ONLY with a JSON object with this exact structure:
 {
   "root_cause": "Clear one-sentence description of the root cause",
   "confidence": 0.85,
-  "failure_pattern": "One of: OOMKill | CrashLoop | ConfigError | NetworkTimeout | ImagePullError | ResourceExhaustion | DependencyFailure | NodePressure | StorageFailure | Unknown",
+  "failure_pattern": "One of: OOMKill | CrashLoop | ConfigError | NetworkTimeout | ImagePullError | ResourceExhaustion | DependencyFailure | NodePressure | StorageFailure | VMUnreachable | VMDeallocated | ResourceHealthDegraded | PlatformDegraded | Unknown",
   "recommended_actions": ["Action 1", "Action 2", "Action 3"],
   "supporting_evidence": ["Evidence item 1", "Evidence item 2"]
 }
 
-Analyze the incident context carefully:
-- Pod events (reason, message fields)
-- Log content (errors, stack traces, connection failures)
-- Resource metrics (restart count, memory usage)
-- Node conditions
-- Deployment history
+Analyze the incident context carefully — it will contain one of:
+- Kubernetes: pod events, log content, restart count, node conditions
+- Azure: resource group/subscription, resource health state, activity log entries
+- VM platform (Nutanix/VMware/OpenShift): platform name/type, health status, response time
 """
 
 
@@ -97,10 +97,12 @@ class RCAEngine:
         try:
             import json
 
-            response = await asyncio.wait_for(
-                self._ai_client.complete(
-                    system_prompt=_RCA_SYSTEM_PROMPT,
-                    user_message=user_message,
+            response, _tokens = await asyncio.wait_for(
+                self._ai_client.generate_response(
+                    messages=[
+                        {"role": "system", "content": _RCA_SYSTEM_PROMPT},
+                        {"role": "user", "content": user_message},
+                    ],
                     model="gpt-4o",
                     max_tokens=800,
                 ),
@@ -137,28 +139,68 @@ class RCAEngine:
             return self._fallback_rca(incident_context)
 
     @staticmethod
-    def _build_context_message(ctx: dict[str, Any]) -> str:
+    def _resource_label(ctx: dict[str, Any]) -> str:
+        """Human-readable resource descriptor across all four domains (SPEC-006)."""
+        if ctx.get("platform_name"):
+            return f"{ctx['platform_name']} ({ctx.get('platform_type', 'platform')})"
+        if ctx.get("resource_group"):
+            kind = ctx.get("resource_type", "resource")
+            return f"{kind}/{ctx.get('resource_name', 'unknown')} in {ctx['resource_group']}"
+        ns = f" (ns: {ctx['namespace']})" if ctx.get("namespace") else ""
+        return f"{ctx.get('resource_kind', 'Pod')}/{ctx.get('resource_name', 'unknown')}{ns}"
+
+    @classmethod
+    def _build_context_message(cls, ctx: dict[str, Any]) -> str:
+        """
+        Build the AI prompt's context section. Branches on whichever domain
+        scoping field is present (`platform_name` / `resource_group` / `namespace`)
+        per the shared event contract established in SPEC-003.
+        """
         lines = [
             "## Incident Context",
-            f"Resource: {ctx.get('resource_kind', 'Pod')}/{ctx.get('resource_name', 'unknown')}",
-            f"Namespace: {ctx.get('namespace', 'default')}",
-            f"Restart Count: {ctx.get('restarts', 0)}",
-            "",
-            "## Recent Events",
+            f"Event Type: {ctx.get('event_type', 'unknown')}",
+            f"Severity: {ctx.get('severity', 'unknown')}",
         ]
-        for ev in (ctx.get("events") or [])[:10]:
-            lines.append(
-                f"- [{ev.get('type', '')}] {ev.get('reason', '')}: {ev.get('message', '')}"
-            )
 
-        lines += ["", "## Recent Logs"]
+        if ctx.get("platform_name"):
+            lines += [
+                f"Platform: {ctx['platform_name']} ({ctx.get('platform_type', 'unknown')})",
+                f"Status: {ctx.get('status', 'unknown')}",
+            ]
+        elif ctx.get("resource_group"):
+            lines += [
+                f"Azure Resource: {ctx.get('resource_type', 'resource')}/{ctx.get('resource_name', 'unknown')}",
+                f"Resource Group: {ctx['resource_group']}",
+            ]
+            if ctx.get("subscription_id"):
+                lines.append(f"Subscription: {ctx['subscription_id']}")
+            if ctx.get("availability_state"):
+                lines.append(f"Availability State: {ctx['availability_state']}")
+        else:
+            lines += [
+                f"Resource: {ctx.get('resource_kind', 'Pod')}/{ctx.get('resource_name', 'unknown')}",
+                f"Namespace: {ctx.get('namespace', 'default')}",
+                f"Restart Count: {ctx.get('restarts', 0)}",
+            ]
+
+        lines += ["", "## Summary", ctx.get("message") or "(no message provided)"]
+
+        if ctx.get("events"):
+            lines += ["", "## Recent Events"]
+            for ev in (ctx.get("events") or [])[:10]:
+                lines.append(
+                    f"- [{ev.get('type', '')}] {ev.get('reason', '')}: {ev.get('message', '')}"
+                )
+
+        if ctx.get("activity_log"):
+            lines += ["", "## Activity Log"]
+            for entry in (ctx.get("activity_log") or [])[:10]:
+                lines.append(f"- {entry}")
+
         logs = ctx.get("logs", "")
         if logs:
-            # Show last 50 lines
-            log_lines = logs.strip().split("\n")[-50:]
-            lines.extend(log_lines)
-        else:
-            lines.append("(no logs available)")
+            lines += ["", "## Recent Logs"]
+            lines.extend(logs.strip().split("\n")[-50:])
 
         if ctx.get("metrics"):
             lines += ["", "## Metrics"]
@@ -199,14 +241,15 @@ class RCAEngine:
                 supporting_evidence=[f"Pod has {restarts} restarts"],
                 incident_context=ctx,
             )
+        resource_label = RCAEngine._resource_label(ctx)
         return RCAReport(
-            root_cause="Unknown — insufficient data for automated analysis",
+            root_cause=f"Unknown — insufficient data for automated analysis of {resource_label}",
             confidence=0.30,
             failure_pattern="Unknown",
             recommended_actions=[
-                "Inspect pod events manually",
-                "Review recent deployments",
-                "Check cluster events",
+                f"Inspect {resource_label}'s recent events/logs manually",
+                "Review recent changes or deployments",
+                "Check platform/cluster-level status dashboards",
             ],
             supporting_evidence=[],
             incident_context=ctx,

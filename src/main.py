@@ -16,7 +16,7 @@ from slowapi.errors import RateLimitExceeded
 
 import src.monitoring.metrics as _metrics  # noqa: F401 — registers Prometheus metrics on import
 from src.ai import AIRouter
-from src.api import health_router, limiter, set_message_router, webhook_router
+from src.api import health_router, incidents_router, limiter, set_message_router, webhook_router
 from src.api.middleware import ContentSizeLimitMiddleware, CorrelationIdMiddleware
 from src.channels import create_router
 from src.config import get_settings, load_agents_config
@@ -177,6 +177,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             notify_callback=router.send_message if router else None,
         )
 
+        # ── AIOps intelligence layer (SPEC-006): RCA + log analysis + incident
+        # persistence, generalized across all four domains and shared by every
+        # watch-loop via _on_cluster_event below.
+        from src.aiops.log_analyzer import LogAnalyzer
+        from src.aiops.rca_engine import RCAEngine
+
+        rca_engine = RCAEngine(ai_client=ai_client)
+        log_analyzer = LogAnalyzer()
+
         async def _on_cluster_event(event: Any) -> None:
             """Route watch-loop events → rule engine → approval / auto-remediation."""
             try:
@@ -184,6 +193,68 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 matches = rule_engine.evaluate(event_dict)
                 if not matches:
                     return
+
+                # ── RCA + log analysis + incident persistence (SPEC-006) ──
+                # Independently try/excepted so a diagnosis/persistence failure
+                # never blocks the alert + remediation flow below.
+                rca_report = None
+                log_result = None
+                incident_id = None
+                try:
+                    rca_report = await rca_engine.analyze(event_dict)
+
+                    log_text = event_dict.get("logs") or event_dict.get("activity_log")
+                    if log_text:
+                        if not isinstance(log_text, str):
+                            log_text = "\n".join(str(line) for line in log_text)
+                        source_id = _describe_event_resource(event_dict).strip("`")
+                        log_result = await log_analyzer.analyze_text_with_ai(
+                            source_id=source_id,
+                            source_label=source_id,
+                            logs=log_text,
+                            ai_client=ai_client,
+                            context_label=f"log output for {source_id}",
+                        )
+
+                    if settings.aiops_incident_persistence_enabled:
+                        from datetime import UTC, datetime
+
+                        from src.database.models import Incident
+                        from src.database.postgres import get_db_session
+
+                        extra_data = {
+                            k: v
+                            for k, v in {
+                                "platform_name": event_dict.get("platform_name"),
+                                "resource_group": event_dict.get("resource_group"),
+                                "subscription_id": event_dict.get("subscription_id"),
+                                "failure_pattern": (
+                                    rca_report.failure_pattern if rca_report else None
+                                ),
+                                "log_summary": log_result.summary if log_result else None,
+                            }.items()
+                            if v is not None
+                        }
+                        async with get_db_session() as session:
+                            incident = Incident(
+                                title=(
+                                    f"{event.event_type}: {_describe_event_resource(event_dict)}"
+                                ),
+                                severity=event.severity,
+                                status="investigating",
+                                event_type=event.event_type,
+                                namespace=event_dict.get("namespace"),
+                                resource_kind=event_dict.get("resource_kind"),
+                                resource_name=event_dict.get("resource_name"),
+                                root_cause=rca_report.root_cause if rca_report else None,
+                                rca_confidence=rca_report.confidence if rca_report else None,
+                                extra_data=extra_data,
+                            )
+                            session.add(incident)
+                            await session.flush()
+                            incident_id = incident.id
+                except Exception as rca_exc:
+                    logger.error("aiops_rca_pipeline_error", error=str(rca_exc))
 
                 # Notify AIOps channel about detected issue
                 if settings.aiops_notification_channel:
@@ -207,9 +278,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                             alert_msg += f"\n\n🔧 Playbooks queued: `{', '.join(playbook_names)}`"
                             if approval_manager:
                                 alert_msg += "\nHigh-risk steps will require your approval."
+                        if rca_report:
+                            alert_msg += f"\n\n{rca_report.to_markdown()}"
+                        if log_result and log_result.detected_patterns:
+                            alert_msg += f"\n\n{log_result.to_markdown()}"
                         await router.send_message(ch_type, ch_id, alert_msg)
 
                 # Execute playbooks via PlaybookExecutor
+                any_playbook_completed = False
                 if settings.auto_remediation_enabled and playbook_executor:
                     ch_type, ch_id = "", ""
                     if settings.aiops_notification_channel:
@@ -226,6 +302,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                                 channel_target=ch_id,
                                 requested_by="watchloop",
                             )
+                            if run.status == "completed":
+                                any_playbook_completed = True
                             logger.info(
                                 "playbook_run_finished",
                                 playbook=playbook_id,
@@ -238,6 +316,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                                 playbook=playbook_id,
                                 error=str(pb_exc),
                             )
+
+                if incident_id and any_playbook_completed:
+                    try:
+                        from datetime import UTC, datetime
+
+                        from src.database.models import Incident
+                        from src.database.postgres import get_db_session
+
+                        async with get_db_session() as session:
+                            incident = await session.get(Incident, incident_id)
+                            if incident:
+                                incident.status = "resolved"
+                                incident.resolved_at = datetime.now(UTC)
+                    except Exception as resolve_exc:
+                        logger.error("aiops_incident_resolve_error", error=str(resolve_exc))
             except Exception as exc:
                 logger.error("watchloop_event_handler_error", error=str(exc))
 
@@ -246,6 +339,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.warning("aiops_pipeline_init_failed", error=str(e))
         rule_engine = None
         playbook_executor = None
+        rca_engine = None
+        log_analyzer = None
         _on_cluster_event = None
 
     # ──────────────────────────────────────────────────────────────
@@ -474,6 +569,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # ty
 # Include routers
 app.include_router(health_router, tags=["Health"])
 app.include_router(webhook_router, prefix="/api", tags=["Webhooks"])
+app.include_router(incidents_router)
 
 
 def get_watchloop() -> Any:

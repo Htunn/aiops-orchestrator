@@ -168,6 +168,12 @@ class Settings(BaseSettings):
         default=60, ge=10, description="Timeout for a single MCP tool call (seconds)"
     )
 
+    # AIOps - Incident persistence & diagnosis (SPEC-006)
+    aiops_incident_persistence_enabled: bool = Field(
+        default=True,
+        description="Persist RCA/incident records to the incidents table on rule matches",
+    )
+
     # Platform Authentication - Nutanix
     nutanix_endpoint: str | None = Field(None, description="Nutanix Prism Central endpoint")
     nutanix_username: str | None = Field(None, description="Nutanix username")

@@ -1,7 +1,8 @@
 """Unit tests for LogAnalyzer."""
 
 import pytest
-from src.aiops.log_analyzer import LogAnalyzer, LogAnalysisResult, LogSeverity
+
+from src.aiops.log_analyzer import LogAnalysisResult, LogAnalyzer, LogSeverity
 
 
 class TestLogAnalyzerBasic:
@@ -9,7 +10,9 @@ class TestLogAnalyzerBasic:
         self.analyzer = LogAnalyzer()
 
     def test_clean_log_has_zero_errors(self):
-        result = self.analyzer.analyze("pod", "ns", "INFO: server started\nINFO: listening on :8080")
+        result = self.analyzer.analyze(
+            "pod", "ns", "INFO: server started\nINFO: listening on :8080"
+        )
         assert result.error_count == 0
         assert result.detected_patterns == []
 
@@ -84,12 +87,16 @@ class TestLogAnalyzerPatterns:
         assert "Disk Full" in names
 
     def test_database_error_detected(self):
-        result = self.analyzer.analyze("pod", "ns", "SQL error: deadlock detected, retry transaction")
+        result = self.analyzer.analyze(
+            "pod", "ns", "SQL error: deadlock detected, retry transaction"
+        )
         names = [p.pattern_name for p in result.detected_patterns]
         assert "Database Error" in names
 
     def test_tls_error_detected(self):
-        result = self.analyzer.analyze("pod", "ns", "tls handshake error: x509: certificate verify failed")
+        result = self.analyzer.analyze(
+            "pod", "ns", "tls handshake error: x509: certificate verify failed"
+        )
         names = [p.pattern_name for p in result.detected_patterns]
         assert "TLS/SSL Error" in names
 
@@ -142,10 +149,15 @@ class TestLogAnalyzerTruncation:
 class TestLogAnalysisResultMarkdown:
     def test_to_markdown_no_patterns(self):
         from src.aiops.log_analyzer import LogAnalysisResult
+
         result = LogAnalysisResult(
-            pod_name="web", namespace="default",
-            total_lines=100, error_count=0, warning_count=0,
-            detected_patterns=[], summary="all clear",
+            pod_name="web",
+            namespace="default",
+            total_lines=100,
+            error_count=0,
+            warning_count=0,
+            detected_patterns=[],
+            summary="all clear",
             raw_errors=[],
         )
         md = result.to_markdown()
@@ -154,15 +166,94 @@ class TestLogAnalysisResultMarkdown:
 
     def test_to_markdown_includes_pattern_names(self):
         from src.aiops.log_analyzer import LogAnalysisResult, LogMatch
+
         match = LogMatch(
-            pattern_name="OOMKill", severity=LogSeverity.CRITICAL,
-            matched_lines=["out of memory"], count=3,
+            pattern_name="OOMKill",
+            severity=LogSeverity.CRITICAL,
+            matched_lines=["out of memory"],
+            count=3,
         )
         result = LogAnalysisResult(
-            pod_name="pod", namespace="ns",
-            total_lines=50, error_count=3, warning_count=0,
-            detected_patterns=[match], summary="OOMKill detected",
+            pod_name="pod",
+            namespace="ns",
+            total_lines=50,
+            error_count=3,
+            warning_count=0,
+            detected_patterns=[match],
+            summary="OOMKill detected",
             raw_errors=["out of memory"],
         )
         md = result.to_markdown()
         assert "OOMKill" in md
+
+
+class TestAnalyzeTextGeneric:
+    """Domain-agnostic entrypoint (SPEC-006) — Azure/VM-platform log analysis."""
+
+    def setup_method(self):
+        self.analyzer = LogAnalyzer()
+
+    def test_analyze_text_azure_activity_log(self):
+        result = self.analyzer.analyze_text(
+            "prod-rg/web-01", "web-01", "connection refused to db:5432"
+        )
+        names = [p.pattern_name for p in result.detected_patterns]
+        assert "Connection Refused" in names
+        assert result.source_id == "prod-rg/web-01"
+
+    def test_analyze_text_no_namespace_markdown(self):
+        result = self.analyzer.analyze_text("nutanix-prod/vm-42", "vm-42", "panic: fatal error")
+        md = result.to_markdown()
+        assert "vm-42" in md
+        assert "(ns:" not in md  # no K8s namespace to display
+
+    def test_analyze_wrapper_still_sets_pod_and_namespace(self):
+        result = self.analyzer.analyze("my-pod", "my-ns", "INFO ok")
+        assert result.pod_name == "my-pod"
+        assert result.namespace == "my-ns"
+        assert result.source_id == "my-ns/my-pod"
+
+
+class TestAnalyzeWithAIGenericContract:
+    """Verifies the AI-enrichment call uses generate_response(), not .complete()."""
+
+    @pytest.mark.asyncio
+    async def test_analyze_with_ai_calls_generate_response(self):
+        class _FakeAIClient:
+            def __init__(self):
+                self.called_with = None
+
+            async def generate_response(self, messages, model, **kwargs):
+                self.called_with = (messages, model)
+                return "Likely an OOM kill; increase memory limits.", 10
+
+        ai_client = _FakeAIClient()
+        result = await self.analyzer.analyze_with_ai(
+            "web-pod", "prod", "out of memory: Kill process 1", ai_client
+        )
+        assert ai_client.called_with is not None
+        assert result.ai_classification == "Likely an OOM kill; increase memory limits."
+
+    @pytest.mark.asyncio
+    async def test_analyze_text_with_ai_uses_context_label(self):
+        class _FakeAIClient:
+            def __init__(self):
+                self.prompt = None
+
+            async def generate_response(self, messages, model, **kwargs):
+                self.prompt = messages[0]["content"]
+                return "Azure VM appears deallocated.", 10
+
+        ai_client = _FakeAIClient()
+        result = await self.analyzer.analyze_text_with_ai(
+            "prod-rg/web-01",
+            "web-01",
+            "VM deallocated by user",
+            ai_client,
+            context_label="Azure Activity Log for web-01",
+        )
+        assert "Azure Activity Log for web-01" in ai_client.prompt
+        assert result.ai_classification == "Azure VM appears deallocated."
+
+    def setup_method(self):
+        self.analyzer = LogAnalyzer()
