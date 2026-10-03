@@ -116,7 +116,11 @@ class StdioTransport:
         Returns:
             JSON-RPC error response
         """
-        response: dict[str, Any] = {"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": message}}
+        response: dict[str, Any] = {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "error": {"code": code, "message": message},
+        }
 
         if data is not None:
             response["error"]["data"] = data

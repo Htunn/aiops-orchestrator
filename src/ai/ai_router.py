@@ -84,7 +84,7 @@ class AIRouter(BaseAIClient):
 
     def _is_vllm_model(self, model: str) -> bool:
         """Check if model should be routed to vLLM.
-        
+
         vLLM models typically have "/" in the name (e.g., meta-llama/Llama-2-7b-chat-hf)
         or start with "vllm:" prefix.
         """
@@ -97,22 +97,33 @@ class AIRouter(BaseAIClient):
 
     def _is_ollama_model(self, model: str) -> bool:
         """Check if model should be routed to Ollama.
-        
+
         Ollama models are typically simple names like "llama2", "mistral", etc.
         or start with "ollama:" prefix.
         """
         if model.startswith("ollama:"):
             return True
-        
+
         model_lower = model.lower()
         # HuggingFace-format Ollama model refs (e.g., hf.co/htunn/gemma-4-e2b-aiops-gguf:Q4_K_M)
         if model_lower.startswith("hf.co/"):
             return True
         # Common Ollama model names/patterns
         ollama_patterns = [
-            "llama2", "llama3", "mistral", "mixtral", "codellama",
-            "phi", "neural-chat", "vicuna", "qwen", "deepseek-coder",
-            "orca-mini", "solar", "yi", "gemma"
+            "llama2",
+            "llama3",
+            "mistral",
+            "mixtral",
+            "codellama",
+            "phi",
+            "neural-chat",
+            "vicuna",
+            "qwen",
+            "deepseek-coder",
+            "orca-mini",
+            "solar",
+            "yi",
+            "gemma",
         ]
         return any(model_lower.startswith(p) or model_lower == p for p in ollama_patterns)
 
@@ -136,9 +147,7 @@ class AIRouter(BaseAIClient):
 
         if self._is_vllm_model(model):
             if self._vllm is None:
-                raise RuntimeError(
-                    f"Model '{model}' requires vLLM but VLLM_BASE_URL is not set."
-                )
+                raise RuntimeError(f"Model '{model}' requires vLLM but VLLM_BASE_URL is not set.")
             return self._vllm
 
         if self._is_ollama_model(model):
@@ -166,7 +175,12 @@ class AIRouter(BaseAIClient):
         # Strip provider prefix if present
         actual_model = self._strip_provider_prefix(model)
         backend = self._backend_for(model)
-        logger.debug("ai_router_dispatch", model=model, actual_model=actual_model, backend=type(backend).__name__)
+        logger.debug(
+            "ai_router_dispatch",
+            model=model,
+            actual_model=actual_model,
+            backend=type(backend).__name__,
+        )
         return await backend.generate_response(
             messages=messages,
             model=actual_model,
@@ -196,14 +210,14 @@ class AIRouter(BaseAIClient):
 
     def is_model_supported(self, model: str) -> bool:
         actual_model = self._strip_provider_prefix(model)
-        
+
         if self._is_gemini_model(model):
             return self._gemini is not None and self._gemini.is_model_supported(actual_model)
         if self._is_vllm_model(model):
             return self._vllm is not None and self._vllm.is_model_supported(actual_model)
         if self._is_ollama_model(model):
             return self._ollama is not None and self._ollama.is_model_supported(actual_model)
-        
+
         return self._github.is_model_supported(actual_model)
 
     def list_supported_models(self) -> list[str]:

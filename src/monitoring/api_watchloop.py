@@ -152,7 +152,11 @@ class ApiBackendWatchLoop:
     def get_status(self, endpoint_name: str | None = None) -> dict[str, ApiBackendStatus]:
         """Get current status of monitored endpoints."""
         if endpoint_name:
-            return {endpoint_name: self._status.get(endpoint_name)} if endpoint_name in self._status else {}  # type: ignore
+            return (
+                {endpoint_name: self._status.get(endpoint_name)}
+                if endpoint_name in self._status
+                else {}
+            )  # type: ignore
         return self._status.copy()
 
     async def _monitor_backend(self, backend: ApiBackendConfig) -> None:
@@ -210,7 +214,9 @@ class ApiBackendWatchLoop:
                     is_up=is_success,
                     last_check_time=start_time.isoformat(),
                     last_latency_ms=latency_ms,
-                    consecutive_failures=0 if is_success else self._consecutive_failures[backend.name] + 1,
+                    consecutive_failures=0
+                    if is_success
+                    else self._consecutive_failures[backend.name] + 1,
                     last_error=None if is_success else f"HTTP {response.status_code}",
                     metadata={"status_code": response.status_code},
                 )
@@ -231,7 +237,10 @@ class ApiBackendWatchLoop:
                     self._consecutive_failures[backend.name] += 1
 
                     # Check if we've crossed the threshold
-                    if self._consecutive_failures[backend.name] >= backend.consecutive_failures_threshold:
+                    if (
+                        self._consecutive_failures[backend.name]
+                        >= backend.consecutive_failures_threshold
+                    ):
                         issue_key = f"{backend.name}:api_backend_down"
                         if issue_key not in self._known_issues:
                             self._known_issues[issue_key] = start_time
@@ -245,7 +254,9 @@ class ApiBackendWatchLoop:
                                     tags=backend.tags,
                                     metadata={
                                         "status_code": response.status_code,
-                                        "consecutive_failures": self._consecutive_failures[backend.name],
+                                        "consecutive_failures": self._consecutive_failures[
+                                            backend.name
+                                        ],
                                         "latency_ms": latency_ms,
                                     },
                                 )
@@ -390,7 +401,9 @@ class ApiBackendWatchLoop:
             )
         except asyncio.QueueFull:
             logger.warning(
-                "api_backend_event_queue_full", endpoint=event.endpoint_name, event_type=event.event_type
+                "api_backend_event_queue_full",
+                endpoint=event.endpoint_name,
+                event_type=event.event_type,
             )
 
     async def _consume_events(self) -> None:

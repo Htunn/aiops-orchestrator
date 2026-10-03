@@ -719,7 +719,10 @@ class MessageHandler:
                     elif any(word in query_lower for word in ["running", "healthy", "ready"]):
                         status_filter = "running"
                         filter_description = " running"
-                    elif any(word in query_lower for word in ["all", "detail", "details", "everything", "full"]):
+                    elif any(
+                        word in query_lower
+                        for word in ["all", "detail", "details", "everything", "full"]
+                    ):
                         status_filter = "all"
                         filter_description = ""
 
@@ -1106,15 +1109,25 @@ class MessageHandler:
     def _is_platform_query(self, message_text: str) -> bool:
         """Check if message is related to platform management."""
         message_lower = message_text.lower()
-        
+
         # Check for platform keywords
         if not any(keyword in message_lower for keyword in PLATFORM_KEYWORDS):
             return False
-        
+
         # Must also contain an action verb to avoid false positives
-        action_verbs = ["start", "stop", "restart", "reboot", "list", "show", "get", "status", "power"]
+        action_verbs = [
+            "start",
+            "stop",
+            "restart",
+            "reboot",
+            "list",
+            "show",
+            "get",
+            "status",
+            "power",
+        ]
         has_action = any(verb in message_lower for verb in action_verbs)
-        
+
         return has_action
 
     async def _handle_platform_query(self, message: ChannelMessage) -> None:
@@ -1139,7 +1152,7 @@ class MessageHandler:
             # Format response
             if result.get("success"):
                 operation = result.get("operation", "operation")
-                
+
                 if operation == "list_vms":
                     # Format VM list nicely
                     total = result.get("total", 0)
@@ -1147,11 +1160,13 @@ class MessageHandler:
                     stopped = result.get("stopped", 0)
                     vms = result.get("vms", [])
                     platforms = result.get("platforms_checked", [])
-                    
+
                     response = f"🖥️ **Virtual Machines**\n\n"
-                    response += f"**Summary:** {total} total ({running} running, {stopped} stopped)\n"
+                    response += (
+                        f"**Summary:** {total} total ({running} running, {stopped} stopped)\n"
+                    )
                     response += f"**Platforms:** {', '.join(platforms)}\n\n"
-                    
+
                     if vms:
                         # Group by platform
                         by_platform = {}
@@ -1160,7 +1175,7 @@ class MessageHandler:
                             if platform not in by_platform:
                                 by_platform[platform] = []
                             by_platform[platform].append(vm)
-                        
+
                         # Display grouped by platform
                         for platform, platform_vms in by_platform.items():
                             response += f"**{platform.upper()}:**\n"
@@ -1175,12 +1190,12 @@ class MessageHandler:
                                 if vm.get("cluster"):
                                     response += f"Cluster: {vm['cluster']}"
                                 response += "\n\n"
-                            
+
                             if len(platform_vms) > 10:
                                 response += f"   _...and {len(platform_vms) - 10} more VMs_\n\n"
                     else:
                         response += "No VMs found.\n"
-                
+
                 elif operation == "list_hosts":
                     # Format host list nicely
                     total = result.get("total", 0)
@@ -1188,40 +1203,46 @@ class MessageHandler:
                     unhealthy = result.get("unhealthy", 0)
                     hosts = result.get("hosts", [])
                     platforms = result.get("platforms_checked", [])
-                    
+
                     response = f"🖥️ **Hosts/Nodes**\n\n"
-                    response += f"**Summary:** {total} total ({healthy} healthy, {unhealthy} unhealthy)\n"
+                    response += (
+                        f"**Summary:** {total} total ({healthy} healthy, {unhealthy} unhealthy)\n"
+                    )
                     response += f"**Platforms:** {', '.join(platforms)}\n\n"
-                    
+
                     if hosts:
                         for host in hosts[:15]:  # Limit to 15 hosts
                             state_emoji = "✅" if host.get("status") == "ready" else "❌"
                             response += f"{state_emoji} **{host['name']}**\n"
-                            response += f"   Status: {host['status']} | Platform: {host['platform']}"
+                            response += (
+                                f"   Status: {host['status']} | Platform: {host['platform']}"
+                            )
                             if host.get("cpu_capacity"):
                                 response += f" | CPUs: {host['cpu_capacity']}"
                             if host.get("memory_capacity_mb"):
                                 response += f" | Memory: {host['memory_capacity_mb']}MB"
                             response += "\n\n"
-                        
+
                         if len(hosts) > 15:
                             response += f"_...and {len(hosts) - 15} more hosts_\n"
                     else:
                         response += "No hosts found.\n"
-                
+
                 else:
                     # Generic success response for operations like start/stop/restart
                     vm_name = result.get("vm_name", "VM")
                     platform = result.get("platform", "unknown")
-                    
-                    response = f"✅ **{result.get('message', 'Operation completed successfully')}**\n\n"
+
+                    response = (
+                        f"✅ **{result.get('message', 'Operation completed successfully')}**\n\n"
+                    )
                     response += f"**Platform:** {platform}\n"
                     response += f"**VM:** {vm_name}\n"
                     response += f"**Operation:** {operation.replace('_', ' ').title()}\n"
-                    
+
                     if result.get("force"):
                         response += "**Mode:** Force shutdown\n"
-            
+
             else:
                 # Error response
                 error = result.get("error", "Unknown error")
@@ -1930,7 +1951,11 @@ Note: Kubernetes MCP tools are integrated. You can manage your cluster directly 
                     incident_row = row.fetchone()
                     if not incident_row:
                         return f"❌ No incident found matching `{short_id}`."
-                    confidence_str = f" ({incident_row.rca_confidence:.0%})" if incident_row.rca_confidence else ""
+                    confidence_str = (
+                        f" ({incident_row.rca_confidence:.0%})"
+                        if incident_row.rca_confidence
+                        else ""
+                    )
                     return (
                         f"📋 **Incident `{str(incident_row.id)[:8]}`**\n\n"
                         f"**Title:** {incident_row.title}\n"
@@ -2011,6 +2036,7 @@ Note: Kubernetes MCP tools are integrated. You can manage your cluster directly 
         """Handle A2A (Agent-to-Agent) commands."""
         try:
             from src.config import get_settings
+
             settings = get_settings()
 
             if not settings.a2a_enabled:
@@ -2051,12 +2077,21 @@ Note: Kubernetes MCP tools are integrated. You can manage your cluster directly 
                     agents = await registry.list_agents(capability=capability_filter, db=db)
 
                 if not agents:
-                    return f"❌ No agents found with capability: `{capability_filter}`" if capability_filter else "❌ No agents registered yet."
+                    return (
+                        f"❌ No agents found with capability: `{capability_filter}`"
+                        if capability_filter
+                        else "❌ No agents registered yet."
+                    )
 
                 lines = [f"🤖 **Registered Agents** ({len(agents)} total)\n"]
                 for agent in agents:
-                    status_emoji = {"online": "🟢", "offline": "🔴", "degraded": "🟡", "unknown": "⚪"}.get(
-                        agent.status.value if hasattr(agent.status, 'value') else agent.status, "⚪"
+                    status_emoji = {
+                        "online": "🟢",
+                        "offline": "🔴",
+                        "degraded": "🟡",
+                        "unknown": "⚪",
+                    }.get(
+                        agent.status.value if hasattr(agent.status, "value") else agent.status, "⚪"
                     )
                     cap_count = len(agent.capabilities)
                     cap_names = [c.name for c in agent.capabilities[:3]]
@@ -2090,7 +2125,7 @@ Note: Kubernetes MCP tools are integrated. You can manage your cluster directly 
                     f"**Version:** {agent.version}",
                     f"**Registered:** {agent.registered_at.strftime('%Y-%m-%d %H:%M')}",
                     f"**Last Seen:** {agent.last_seen.strftime('%Y-%m-%d %H:%M')}",
-                    f"\n**Capabilities ({len(agent.capabilities)}):**\n"
+                    f"\n**Capabilities ({len(agent.capabilities)}):**\n",
                 ]
                 for cap in agent.capabilities:
                     lines.append(f"• `{cap.name}` - {cap.description}")
@@ -2100,12 +2135,15 @@ Note: Kubernetes MCP tools are integrated. You can manage your cluster directly 
 
             elif args[0] == "status":
                 import httpx
+
                 try:
                     async with httpx.AsyncClient() as client:
                         response = await client.get("http://localhost:8000/health/a2a")
                         if response.status_code == 200:
                             data = response.json()
-                            caps_display = "\n".join(f"• `{c}`" for c in data.get('capabilities', [])[:10])
+                            caps_display = "\n".join(
+                                f"• `{c}`" for c in data.get("capabilities", [])[:10]
+                            )
                             return (
                                 f"🤖 **A2A System Status**\n\n"
                                 f"**Enabled:** {'✅ Yes' if data.get('enabled') else '❌ No'}\n"

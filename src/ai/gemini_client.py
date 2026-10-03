@@ -36,8 +36,7 @@ class GeminiClient(BaseAIClient):
         self._api_key = api_key or settings.gemini_api_key
         if not self._api_key:
             raise ValueError(
-                "GEMINI_API_KEY is not set. "
-                "Set it in .env or pass api_key= to GeminiClient()."
+                "GEMINI_API_KEY is not set. Set it in .env or pass api_key= to GeminiClient()."
             )
         genai.configure(api_key=self._api_key)
         self._genai = genai
@@ -67,7 +66,9 @@ class GeminiClient(BaseAIClient):
             content = msg.get("content", "")
             if role == "system":
                 # Gemini accepts a single system instruction at model construction
-                system_instruction = (system_instruction + "\n\n" + content) if system_instruction else content
+                system_instruction = (
+                    (system_instruction + "\n\n" + content) if system_instruction else content
+                )
             elif role == "user":
                 history.append({"role": "user", "parts": [{"text": content}]})
             elif role == "assistant":

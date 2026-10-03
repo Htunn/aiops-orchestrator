@@ -112,9 +112,7 @@ class TaskDelegator:
         )
 
         if not agents:
-            raise A2ACapabilityNotFoundError(
-                f"No agents found with capability: {capability}"
-            )
+            raise A2ACapabilityNotFoundError(f"No agents found with capability: {capability}")
 
         # Select best agent using capability matcher
         selected_agent = await self._select_best_agent(agents, capability, parameters)
@@ -268,13 +266,12 @@ class TaskDelegator:
         Raises:
             A2ATaskDelegationError: If cancellation fails
         """
+
         async def _cancel_internal(db: AsyncSession) -> bool:
             from sqlalchemy import select
 
             # Fetch task
-            result = await db.execute(
-                select(AgentTask).where(AgentTask.task_id == task_id)
-            )
+            result = await db.execute(select(AgentTask).where(AgentTask.task_id == task_id))
             task = result.scalar_one_or_none()
 
             if not task:
@@ -282,7 +279,11 @@ class TaskDelegator:
                 return False
 
             # Check if task can be cancelled
-            if task.status in {TaskStatus.COMPLETED.value, TaskStatus.FAILED.value, TaskStatus.CANCELLED.value}:
+            if task.status in {
+                TaskStatus.COMPLETED.value,
+                TaskStatus.FAILED.value,
+                TaskStatus.CANCELLED.value,
+            }:
                 logger.warning(
                     "a2a_cancel_invalid_status",
                     task_id=task_id,

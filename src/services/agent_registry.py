@@ -76,9 +76,7 @@ class AgentRegistry:
             from src.database.models import Agent
 
             # Check if agent exists
-            result = await session.execute(
-                select(Agent).where(Agent.agent_id == agent_id)
-            )
+            result = await session.execute(select(Agent).where(Agent.agent_id == agent_id))
             existing = result.scalar_one_or_none()
 
             if existing:
@@ -139,19 +137,17 @@ class AgentRegistry:
         async with get_db_session() as session:
             from src.database.models import Agent
 
-            result = await session.execute(
-                select(Agent).where(Agent.agent_id == agent_id)
-            )
+            result = await session.execute(select(Agent).where(Agent.agent_id == agent_id))
             agent = result.scalar_one_or_none()
 
             if not agent:
                 return None
 
             agent_info = self._db_agent_to_model(agent)
-            
+
             # Cache for next time
             await self._cache_agent(agent_info)
-            
+
             return agent_info
 
     async def list_agents(
@@ -185,8 +181,11 @@ class AgentRegistry:
             # Apply capability filter if specified
             if capability_filter:
                 agent_infos = [
-                    agent for agent in agent_infos
-                    if any(capability_filter.lower() in cap.name.lower() for cap in agent.capabilities)
+                    agent
+                    for agent in agent_infos
+                    if any(
+                        capability_filter.lower() in cap.name.lower() for cap in agent.capabilities
+                    )
                 ]
 
             return agent_infos
@@ -280,9 +279,7 @@ class AgentRegistry:
         async with get_db_session() as session:
             from src.database.models import Agent
 
-            result = await session.execute(
-                select(Agent).where(Agent.agent_id == agent_id)
-            )
+            result = await session.execute(select(Agent).where(Agent.agent_id == agent_id))
             agent = result.scalar_one_or_none()
 
             if not agent:

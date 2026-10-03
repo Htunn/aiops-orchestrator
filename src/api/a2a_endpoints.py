@@ -326,9 +326,7 @@ async def get_task_status(
     from sqlalchemy import select
 
     # Fetch task from database
-    result = await db.execute(
-        select(AgentTask).where(AgentTask.task_id == task_id)
-    )
+    result = await db.execute(select(AgentTask).where(AgentTask.task_id == task_id))
     task = result.scalar_one_or_none()
 
     if not task:
@@ -374,9 +372,7 @@ async def receive_webhook(
     from sqlalchemy import select
 
     # Update task status
-    result = await db.execute(
-        select(AgentTask).where(AgentTask.task_id == payload.task_id)
-    )
+    result = await db.execute(select(AgentTask).where(AgentTask.task_id == payload.task_id))
     task = result.scalar_one_or_none()
 
     if task:

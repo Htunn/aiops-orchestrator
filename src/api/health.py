@@ -268,7 +268,9 @@ async def api_backends_health() -> dict[str, Any]:
                 result["backends"][name] = {
                     "url": status.url,
                     "is_up": status.is_up,
-                    "status": "up" if status.is_up and not is_degraded else ("degraded" if status.is_up else "down"),
+                    "status": "up"
+                    if status.is_up and not is_degraded
+                    else ("degraded" if status.is_up else "down"),
                     "last_check_time": status.last_check_time,
                     "last_latency_ms": status.last_latency_ms,
                     "consecutive_failures": status.consecutive_failures,
@@ -284,7 +286,6 @@ async def api_backends_health() -> dict[str, Any]:
         result["error"] = str(e)
 
     return result
-
 
 
 @router.get("/health/a2a")
@@ -340,9 +341,7 @@ async def a2a_health() -> dict[str, Any]:
             # Count recent delegations (last 24 hours)
             cutoff = datetime.now(UTC) - timedelta(hours=24)
             recent_count_result = await db.execute(
-                select(func.count(AgentTask.id)).where(
-                    AgentTask.created_at >= cutoff
-                )
+                select(func.count(AgentTask.id)).where(AgentTask.created_at >= cutoff)
             )
             result["recent_delegations_24h"] = recent_count_result.scalar() or 0
 

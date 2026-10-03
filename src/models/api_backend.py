@@ -16,9 +16,7 @@ class ApiBackendConfig(BaseModel):
     check_interval_seconds: int = Field(
         default=60, ge=10, description="How often to check this endpoint (minimum 10s)"
     )
-    timeout_seconds: int = Field(
-        default=10, ge=1, le=60, description="Request timeout in seconds"
-    )
+    timeout_seconds: int = Field(default=10, ge=1, le=60, description="Request timeout in seconds")
     latency_threshold_ms: int = Field(
         default=1000, ge=100, description="Latency threshold in milliseconds (triggers alert)"
     )

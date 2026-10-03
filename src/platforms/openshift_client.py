@@ -94,7 +94,7 @@ class OpenShiftClient(BasePlatformClient):
         if self._client:
             await self._client.aclose()
             self._client = None
-        
+
         if self._k8s_client:
             # Close K8s client if initialized
             self._k8s_client = None
@@ -166,7 +166,9 @@ class OpenShiftClient(BasePlatformClient):
 
                 project_info = {
                     "name": metadata.get("name", "unknown"),
-                    "display_name": metadata.get("annotations", {}).get("openshift.io/display-name"),
+                    "display_name": metadata.get("annotations", {}).get(
+                        "openshift.io/display-name"
+                    ),
                     "description": metadata.get("annotations", {}).get("openshift.io/description"),
                     "phase": status.get("phase", "Unknown"),
                     "created_at": metadata.get("creationTimestamp"),
@@ -253,7 +255,9 @@ class OpenShiftClient(BasePlatformClient):
                     "service": spec.get("to", {}).get("name"),
                     "port": spec.get("port", {}).get("targetPort"),
                     "tls_enabled": spec.get("tls") is not None,
-                    "tls_termination": spec.get("tls", {}).get("termination") if spec.get("tls") else None,
+                    "tls_termination": spec.get("tls", {}).get("termination")
+                    if spec.get("tls")
+                    else None,
                     "admitted": any(
                         ingress.get("conditions", [{}])[0].get("status") == "True"
                         for ingress in status.get("ingress", [])
@@ -486,7 +490,9 @@ class OpenShiftClient(BasePlatformClient):
                 cpu_capacity = int(capacity.get("cpu", 0))
                 memory_str = capacity.get("memory", "0Ki")
                 # Convert memory string (e.g., "7982136Ki") to MB
-                memory_capacity_mb = int(memory_str.rstrip("Ki")) // 1024 if "Ki" in memory_str else 0
+                memory_capacity_mb = (
+                    int(memory_str.rstrip("Ki")) // 1024 if "Ki" in memory_str else 0
+                )
 
                 hosts.append(
                     HostResource(

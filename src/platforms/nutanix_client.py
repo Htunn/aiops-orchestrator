@@ -168,7 +168,7 @@ class NutanixClient(BasePlatformClient):
                 # Extract VM details
                 vm_id = entity.get("metadata", {}).get("uuid", "")
                 name = status.get("name", spec.get("name", "unknown"))
-                
+
                 # Map Nutanix power state to standard states
                 power_state_map = {
                     "ON": "running",
@@ -238,7 +238,7 @@ class NutanixClient(BasePlatformClient):
             resources = spec.get("resources", {})
 
             name = status.get("name", spec.get("name", "unknown"))
-            
+
             # Map power state
             power_state_map = {
                 "ON": "running",
@@ -248,9 +248,7 @@ class NutanixClient(BasePlatformClient):
             nutanix_state = resources.get("power_state", "UNKNOWN")
             power_state = power_state_map.get(nutanix_state, "unknown")
 
-            cpu_count = resources.get("num_sockets", 0) * resources.get(
-                "num_vcpus_per_socket", 1
-            )
+            cpu_count = resources.get("num_sockets", 0) * resources.get("num_vcpus_per_socket", 1)
             memory_mb = resources.get("memory_size_mib", 0)
 
             # Extract IPs
@@ -296,19 +294,13 @@ class NutanixClient(BasePlatformClient):
         try:
             # First get current VM state
             vm = await self.get_vm(vm_id)
-            
+
             if vm.is_running():
                 self.logger.info("vm_already_running", vm_id=vm_id)
                 return True
 
             # Update power state to ON
-            payload = {
-                "spec": {
-                    "resources": {
-                        "power_state": "ON"
-                    }
-                }
-            }
+            payload = {"spec": {"resources": {"power_state": "ON"}}}
 
             response = await self._client.put(f"/vms/{vm_id}", json=payload)
             response.raise_for_status()
@@ -328,7 +320,7 @@ class NutanixClient(BasePlatformClient):
         try:
             # First get current VM state
             vm = await self.get_vm(vm_id)
-            
+
             if vm.power_state == "stopped":
                 self.logger.info("vm_already_stopped", vm_id=vm_id)
                 return True
@@ -336,13 +328,7 @@ class NutanixClient(BasePlatformClient):
             # Update power state to OFF
             # Note: Nutanix doesn't have separate graceful/force shutdown in v3 API
             # The force parameter is provided for interface compatibility
-            payload = {
-                "spec": {
-                    "resources": {
-                        "power_state": "OFF"
-                    }
-                }
-            }
+            payload = {"spec": {"resources": {"power_state": "OFF"}}}
 
             response = await self._client.put(f"/vms/{vm_id}", json=payload)
             response.raise_for_status()
@@ -361,11 +347,11 @@ class NutanixClient(BasePlatformClient):
 
         try:
             vm = await self.get_vm(vm_id)
-            
+
             # Stop the VM if running
             if vm.is_running():
                 await self.stop_vm(vm_id)
-                
+
             # Start the VM
             await self.start_vm(vm_id)
 
@@ -395,10 +381,10 @@ class NutanixClient(BasePlatformClient):
             for entity in data.get("entities", []):
                 status = entity.get("status", {})
                 resources = status.get("resources", {})
-                
+
                 host_id = entity.get("metadata", {}).get("uuid", "")
                 name = status.get("name", "unknown")
-                
+
                 # Map Nutanix host state
                 state = resources.get("hypervisor_state", "UNKNOWN")
                 status_map = {
@@ -412,7 +398,7 @@ class NutanixClient(BasePlatformClient):
                 # Get resource stats
                 cpu_capacity = resources.get("cpu_capacity_hz", 0) // 1_000_000  # Convert to MHz
                 memory_capacity_mb = resources.get("memory_capacity_mib", 0)
-                
+
                 # Get cluster reference
                 cluster_ref = status.get("cluster_reference", {})
                 cluster_name = cluster_ref.get("name")
@@ -457,10 +443,10 @@ class NutanixClient(BasePlatformClient):
 
             status = entity.get("status", {})
             resources = status.get("resources", {})
-            
+
             name = status.get("name", "unknown")
             state = resources.get("hypervisor_state", "UNKNOWN")
-            
+
             status_map = {
                 "NORMAL": "ready",
                 "ACROPOLIS_NORMAL": "ready",
@@ -471,7 +457,7 @@ class NutanixClient(BasePlatformClient):
 
             cpu_capacity = resources.get("cpu_capacity_hz", 0) // 1_000_000
             memory_capacity_mb = resources.get("memory_capacity_mib", 0)
-            
+
             cluster_ref = status.get("cluster_reference", {})
             cluster_name = cluster_ref.get("name")
 
@@ -514,12 +500,14 @@ class NutanixClient(BasePlatformClient):
             for entity in data.get("entities", []):
                 status = entity.get("status", {})
                 resources = status.get("resources", {})
-                
+
                 cluster_info = {
                     "id": entity.get("metadata", {}).get("uuid", ""),
                     "name": status.get("name", "unknown"),
                     "state": resources.get("state", "UNKNOWN"),
-                    "hypervisor_types": resources.get("config", {}).get("supported_hypervisor_types", []),
+                    "hypervisor_types": resources.get("config", {}).get(
+                        "supported_hypervisor_types", []
+                    ),
                     "num_nodes": len(resources.get("nodes", {}).get("node_list", [])),
                 }
                 clusters.append(cluster_info)

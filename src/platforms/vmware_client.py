@@ -63,7 +63,7 @@ class VMwareClient(BasePlatformClient):
         # Create vCenter session
         try:
             await self._create_session()
-            
+
             # Validate connection
             health = await self.health_check()
             if health.status != "healthy":
@@ -186,7 +186,7 @@ class VMwareClient(BasePlatformClient):
             params = {}
             if cluster:
                 params["filter.clusters"] = cluster
-            
+
             if filters:
                 params.update(filters)
 
@@ -197,7 +197,7 @@ class VMwareClient(BasePlatformClient):
             vms = []
             for vm_summary in data.get("value", []):
                 vm_id = vm_summary.get("vm")
-                
+
                 # Get detailed VM info
                 detail_response = await self._client.get(f"/vcenter/vm/{vm_id}")
                 detail_response.raise_for_status()
@@ -218,7 +218,7 @@ class VMwareClient(BasePlatformClient):
 
                 # Extract host info
                 host_id = vm_detail.get("host")
-                
+
                 # Extract network IPs (requires guest tools)
                 ip_addresses = []
                 guest = vm_detail.get("guest_OS", {})
@@ -318,7 +318,7 @@ class VMwareClient(BasePlatformClient):
         try:
             # Check current state
             vm = await self.get_vm(vm_id)
-            
+
             if vm.is_running():
                 self.logger.info("vm_already_running", vm_id=vm_id)
                 return True
@@ -342,13 +342,15 @@ class VMwareClient(BasePlatformClient):
         try:
             # Check current state
             vm = await self.get_vm(vm_id)
-            
+
             if vm.power_state == "stopped":
                 self.logger.info("vm_already_stopped", vm_id=vm_id)
                 return True
 
             # Stop the VM (graceful shutdown if not forced)
-            endpoint = f"/vcenter/vm/{vm_id}/power/stop" if force else f"/vcenter/vm/{vm_id}/power/stop"
+            endpoint = (
+                f"/vcenter/vm/{vm_id}/power/stop" if force else f"/vcenter/vm/{vm_id}/power/stop"
+            )
             response = await self._client.post(endpoint)
             response.raise_for_status()
 
@@ -399,7 +401,7 @@ class VMwareClient(BasePlatformClient):
             hosts = []
             for host_summary in data.get("value", []):
                 host_id = host_summary.get("host")
-                
+
                 # Map vCenter host connection state
                 state = host_summary.get("connection_state", "UNKNOWN")
                 status_map = {

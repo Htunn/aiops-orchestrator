@@ -31,7 +31,9 @@ class AgentCapability(BaseModel):
     """A capability/skill that an agent provides."""
 
     name: str = Field(..., description="Unique capability identifier")
-    description: str = Field(..., description="Human-readable description of what this capability does")
+    description: str = Field(
+        ..., description="Human-readable description of what this capability does"
+    )
     parameters: dict[str, Any] = Field(
         default_factory=dict,
         description="JSON Schema for capability parameters",

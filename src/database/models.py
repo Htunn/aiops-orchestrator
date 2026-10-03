@@ -277,7 +277,9 @@ class PlatformConfig(Base):
         onupdate=func.now(),
         nullable=False,
     )
-    last_health_check: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_health_check: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     health_status: Mapped[str | None] = mapped_column(
         String(20), nullable=True, comment="healthy, degraded, unreachable"
     )
@@ -292,9 +294,7 @@ class PlatformHealthHistory(Base):
     __tablename__ = "platform_health_history"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    platform_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True
-    )
+    platform_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     response_time_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
     message: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -314,9 +314,7 @@ class PlatformOperation(Base):
     __tablename__ = "platform_operations"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    platform_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True
-    )
+    platform_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
     operation_type: Mapped[str] = mapped_column(
         String(50), nullable=False, index=True, comment="list_vms, start_vm, stop_vm, etc."
     )
@@ -419,7 +417,9 @@ class Agent(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     url: Mapped[str] = mapped_column(String(500), nullable=False)
     capabilities: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
-    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="unknown", index=True)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="unknown", index=True
+    )
     api_key_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     webhook_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     version: Mapped[str] = mapped_column(String(20), nullable=False, server_default="1.0.0")
@@ -447,7 +447,9 @@ class AgentTask(Base):
     capability: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     parameters: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
     context: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
-    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="queued", index=True)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="queued", index=True
+    )
     result: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     async_mode: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
@@ -461,9 +463,7 @@ class AgentTask(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     duration_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
 
-    __table_args__ = (
-        Index("idx_agent_tasks_status_created", "status", "created_at"),
-    )
+    __table_args__ = (Index("idx_agent_tasks_status_created", "status", "created_at"),)
 
     def __repr__(self) -> str:
         return f"<AgentTask {self.task_id} {self.status}>"
@@ -486,9 +486,7 @@ class AgentMessage(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
 
-    __table_args__ = (
-        Index("idx_agent_messages_task_timestamp", "task_id", "timestamp"),
-    )
+    __table_args__ = (Index("idx_agent_messages_task_timestamp", "task_id", "timestamp"),)
 
     def __repr__(self) -> str:
         return f"<AgentMessage {self.message_type} {self.from_agent_id}->{self.to_agent_id}>"

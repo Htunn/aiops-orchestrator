@@ -166,8 +166,8 @@ class AzureResourceClient:
         from azure.identity.aio import ClientSecretCredential, DefaultAzureCredential
 
         settings = get_settings()
-        use_managed_identity = config.get("azure", {}).get("auth", {}).get(
-            "use_managed_identity", False
+        use_managed_identity = (
+            config.get("azure", {}).get("auth", {}).get("use_managed_identity", False)
         )
 
         if use_managed_identity:
@@ -331,7 +331,9 @@ class AzureResourceClient:
 
     # ── Read operations (LOW risk) ───────────────────────────────────────────
 
-    async def list_resource_groups(self, subscription_id: str | None = None) -> list[dict[str, Any]]:
+    async def list_resource_groups(
+        self, subscription_id: str | None = None
+    ) -> list[dict[str, Any]]:
         """List resource groups in scope for a subscription."""
         sub = self._get_subscription(subscription_id)
         client = self._get_resource_client(sub)
@@ -469,10 +471,7 @@ class AzureResourceClient:
         client = self._get_monitor_client(sub)
 
         since = (datetime.now(UTC) - timedelta(hours=lookback_hours)).isoformat()
-        filter_str = (
-            f"eventTimestamp ge '{since}' and "
-            f"resourceGroupName eq '{resource_group}'"
-        )
+        filter_str = f"eventTimestamp ge '{since}' and resourceGroupName eq '{resource_group}'"
         events = []
         async for event in client.activity_logs.list(filter=filter_str):
             events.append(
@@ -580,9 +579,7 @@ class AzureResourceClient:
         client = self._get_web_client(sub)
         plan = await self._call(client.app_service_plans.get, resource_group, plan_name)
         plan.sku.capacity = capacity
-        await self._call(
-            client.app_service_plans.create_or_update, resource_group, plan_name, plan
-        )
+        await self._call(client.app_service_plans.create_or_update, resource_group, plan_name, plan)
         return {
             "status": "succeeded",
             "operation": "scale_app_service_plan",

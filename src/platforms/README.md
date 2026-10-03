@@ -33,7 +33,7 @@ config = PlatformConfig(
     endpoint="https://prism-central.example.com:9440",
     username="admin",
     password="your-password",
-    verify_ssl=True
+    verify_ssl=True,
 )
 
 # Create and initialize client
@@ -42,10 +42,10 @@ async with await PlatformFactory.create_and_initialize(config) as client:
     vms = await client.list_vms()
     for vm in vms:
         print(f"{vm.name}: {vm.power_state}")
-    
+
     # Start a VM
     await client.start_vm(vm_id="abc-123")
-    
+
     # Check health
     health = await client.health_check()
     print(f"Status: {health.status}")
@@ -60,7 +60,7 @@ config = PlatformConfig(
     platform_type=PlatformType.NUTANIX,
     endpoint="https://prism-central.example.com:9440",
     username="admin",
-    password="your-password"
+    password="your-password",
 )
 
 client = NutanixClient(config)
@@ -85,32 +85,32 @@ config = PlatformConfig(
     endpoint="https://prism-central.example.com:9440",
     username="admin",
     password="your-password",
-    verify_ssl=True
+    verify_ssl=True,
 )
 
 async with NutanixClient(config) as client:
     await client.initialize()
-    
+
     # List all VMs
     vms = await client.list_vms()
-    
+
     # Filter VMs by cluster
     prod_vms = await client.list_vms(cluster="Production")
-    
+
     # Get VM details
     vm = await client.get_vm("vm-uuid-here")
     print(f"VM: {vm.name}, CPUs: {vm.cpu_count}, Memory: {vm.memory_mb}MB")
-    
+
     # Power operations
     await client.start_vm(vm.id)
     await client.stop_vm(vm.id, force=False)
     await client.restart_vm(vm.id)
-    
+
     # List hosts
     hosts = await client.list_hosts()
     for host in hosts:
         print(f"Host: {host.name}, Status: {host.status}")
-    
+
     # List clusters
     clusters = await client.list_clusters()
 ```
@@ -131,32 +131,32 @@ config = PlatformConfig(
     endpoint="https://vcenter.example.com",
     username="administrator@vsphere.local",
     password="your-password",
-    verify_ssl=True
+    verify_ssl=True,
 )
 
 async with VMwareClient(config) as client:
     await client.initialize()
-    
+
     # List VMs
     vms = await client.list_vms()
-    
+
     # Filter by cluster
     cluster_vms = await client.list_vms(cluster="Production-Cluster")
-    
+
     # Get VM details
     vm = await client.get_vm("vm-123")
     print(f"VM: {vm.name}, Host: {vm.host}")
-    
+
     # Power operations
     await client.start_vm(vm.id)
     await client.stop_vm(vm.id, force=True)  # force=True for hard shutdown
     await client.restart_vm(vm.id)
-    
+
     # List ESXi hosts
     hosts = await client.list_hosts()
     for host in hosts:
         print(f"ESXi Host: {host.name}, State: {host.status}")
-    
+
     # List clusters
     clusters = await client.list_clusters()
     for cluster in clusters:
@@ -178,36 +178,36 @@ config = PlatformConfig(
     platform_type=PlatformType.OPENSHIFT,
     endpoint="https://api.openshift.example.com:6443",
     token="sha256~your-token-here",
-    verify_ssl=True
+    verify_ssl=True,
 )
 
 async with OpenShiftClient(config) as client:
     await client.initialize()
-    
+
     # List projects
     projects = await client.list_projects()
     for project in projects:
         print(f"Project: {project['name']}, Phase: {project['phase']}")
-    
+
     # Get project details
     project = await client.get_project("production")
-    
+
     # List routes (ingress)
     routes = await client.list_routes("production")
     for route in routes:
         print(f"Route: {route['host']} -> {route['service']}")
-    
+
     # List builds
     builds = await client.list_builds("production")
     for build in builds:
         print(f"Build: {build['name']}, Phase: {build['phase']}")
-    
+
     # List image streams
     imagestreams = await client.list_imagestreams("production")
-    
+
     # List buildconfigs
     buildconfigs = await client.list_buildconfigs("production")
-    
+
     # List nodes (as hosts)
     nodes = await client.list_hosts()
     for node in nodes:
@@ -296,11 +296,11 @@ Health check result:
 ```python
 @dataclass
 class PlatformHealth:
-    platform: str                   # Platform identifier
-    status: str                     # healthy, degraded, unreachable
-    message: str | None             # Status message
+    platform: str  # Platform identifier
+    status: str  # healthy, degraded, unreachable
+    message: str | None  # Status message
     response_time_ms: float | None  # Response time in milliseconds
-    last_check: str | None          # Last check timestamp
+    last_check: str | None  # Last check timestamp
 ```
 
 ### Error Handling
@@ -411,17 +411,20 @@ for config in configs:
 import asyncio
 from src.platforms import PlatformFactory, PlatformConfig
 
+
 async def check_all_platforms(configs):
     tasks = []
     for config in configs:
+
         async def check_platform(cfg):
             async with await PlatformFactory.create_and_initialize(cfg) as client:
                 return await client.health_check()
-        
+
         tasks.append(check_platform(config))
-    
+
     results = await asyncio.gather(*tasks, return_exceptions=True)
     return results
+
 
 # Check all platforms in parallel
 configs = [...]
@@ -471,14 +474,14 @@ health_results = await check_all_platforms(configs)
    config = PlatformConfig(
        platform_type=PlatformType.NUTANIX,
        endpoint="http://localhost:5001",  # Mock server
-       verify_ssl=False
+       verify_ssl=False,
    )
-   
+
    # Production
    config = PlatformConfig(
        platform_type=PlatformType.NUTANIX,
        endpoint="https://real-prism.company.com:9440",
-       verify_ssl=True
+       verify_ssl=True,
    )
    ```
 
@@ -491,17 +494,14 @@ import structlog
 
 # Configure logging
 structlog.configure(
-    processors=[
-        structlog.processors.TimeStamper(fmt="iso"),
-        structlog.processors.JSONRenderer()
-    ]
+    processors=[structlog.processors.TimeStamper(fmt="iso"), structlog.processors.JSONRenderer()]
 )
 
 # Client operations automatically log
 async with client:
     await client.initialize()
     # Logs: nutanix_client_initialized, endpoint=...
-    
+
     vms = await client.list_vms()
     # Logs: listed_vms, count=10
 ```

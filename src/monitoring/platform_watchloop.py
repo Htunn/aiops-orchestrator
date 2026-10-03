@@ -146,9 +146,7 @@ class PlatformWatchLoop:
         except Exception as e:
             logger.error("platform_health_check_failed", error=str(e))
 
-    async def _process_health_result(
-        self, platform_name: str, health: PlatformHealth
-    ) -> None:
+    async def _process_health_result(self, platform_name: str, health: PlatformHealth) -> None:
         """
         Process health check result and generate events.
 
@@ -164,9 +162,7 @@ class PlatformWatchLoop:
 
         # Detect status changes
         if previous_status and previous_status != current_status:
-            await self._handle_status_change(
-                platform_name, health, previous_status, current_status
-            )
+            await self._handle_status_change(platform_name, health, previous_status, current_status)
 
         # Check response time thresholds
         if health.response_time_ms is not None:
@@ -236,9 +232,7 @@ class PlatformWatchLoop:
                     error=str(e),
                 )
 
-    async def _check_response_time(
-        self, platform_name: str, health: PlatformHealth
-    ) -> None:
+    async def _check_response_time(self, platform_name: str, health: PlatformHealth) -> None:
         """
         Check response time and generate events if thresholds exceeded.
 

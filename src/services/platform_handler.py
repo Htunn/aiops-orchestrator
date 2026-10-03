@@ -29,13 +29,13 @@ class PlatformHandler:
 
     Example:
         handler = PlatformHandler()
-        
+
         # Execute command
         result = await handler.execute_command(
             "restart the production-api VM",
             user_id=user_id
         )
-        
+
         # Direct operation
         result = await handler.start_vm(
             platform_name="production-nutanix",
@@ -113,7 +113,9 @@ class PlatformHandler:
             return await self._handle_start_command(command, user_id)
         elif any(word in command_lower for word in ["stop", "power off", "shutdown"]):
             return await self._handle_stop_command(command, user_id)
-        elif any(word in command_lower for word in ["list", "show", "get"]) and "vm" in command_lower:
+        elif (
+            any(word in command_lower for word in ["list", "show", "get"]) and "vm" in command_lower
+        ):
             return await self._handle_list_vms_command(command, user_id)
         elif any(word in command_lower for word in ["list", "show"]) and "host" in command_lower:
             return await self._handle_list_hosts_command(command, user_id)
@@ -123,9 +125,7 @@ class PlatformHandler:
                 "error": "Unable to parse platform command. Try: 'start VM <name>', 'list VMs', etc.",
             }
 
-    async def _handle_restart_command(
-        self, command: str, user_id: UUID | None
-    ) -> dict[str, Any]:
+    async def _handle_restart_command(self, command: str, user_id: UUID | None) -> dict[str, Any]:
         """Handle VM restart command."""
         # Extract VM identifier
         vm_identifier = self._extract_vm_identifier(command)
@@ -172,7 +172,7 @@ class PlatformHandler:
 
         except Exception as e:
             logger.error("restart_vm_failed", vm_name=vm.name, error=str(e))
-            
+
             # Log failure
             registry = await get_platform_registry()
             await registry.log_operation(
@@ -192,9 +192,7 @@ class PlatformHandler:
                 "error": f"Failed to restart VM: {e}",
             }
 
-    async def _handle_start_command(
-        self, command: str, user_id: UUID | None
-    ) -> dict[str, Any]:
+    async def _handle_start_command(self, command: str, user_id: UUID | None) -> dict[str, Any]:
         """Handle VM start command."""
         vm_identifier = self._extract_vm_identifier(command)
         if not vm_identifier:
@@ -242,9 +240,7 @@ class PlatformHandler:
                 "error": f"Failed to start VM: {e}",
             }
 
-    async def _handle_stop_command(
-        self, command: str, user_id: UUID | None
-    ) -> dict[str, Any]:
+    async def _handle_stop_command(self, command: str, user_id: UUID | None) -> dict[str, Any]:
         """Handle VM stop command."""
         vm_identifier = self._extract_vm_identifier(command)
         if not vm_identifier:
@@ -297,13 +293,11 @@ class PlatformHandler:
                 "error": f"Failed to stop VM: {e}",
             }
 
-    async def _handle_list_vms_command(
-        self, command: str, user_id: UUID | None
-    ) -> dict[str, Any]:
+    async def _handle_list_vms_command(self, command: str, user_id: UUID | None) -> dict[str, Any]:
         """Handle list VMs command."""
         # Extract platform name if specified
         platform_name = self._extract_platform_name(command)
-        
+
         # Extract cluster name if specified
         cluster = self._extract_cluster_name(command)
 
@@ -314,13 +308,13 @@ class PlatformHandler:
                 # List VMs from specific platform
                 client = await registry.get_client(platform_name)
                 vms = await client.list_vms(cluster=cluster)
-                
+
                 platforms_checked = {platform_name: vms}
             else:
                 # List VMs from all platforms
                 clients = await registry.get_all_clients()
                 platforms_checked = {}
-                
+
                 for pname, client in clients.items():
                     try:
                         vms = await client.list_vms(cluster=cluster)
@@ -331,22 +325,23 @@ class PlatformHandler:
             # Format results
             total_vms = sum(len(vms) for vms in platforms_checked.values())
             running_vms = sum(
-                sum(1 for vm in vms if vm.is_running())
-                for vms in platforms_checked.values()
+                sum(1 for vm in vms if vm.is_running()) for vms in platforms_checked.values()
             )
 
             vm_list = []
             for pname, vms in platforms_checked.items():
                 for vm in vms:
-                    vm_list.append({
-                        "name": vm.name,
-                        "id": vm.id,
-                        "power_state": vm.power_state,
-                        "platform": pname,
-                        "cluster": vm.cluster,
-                        "cpu_count": vm.cpu_count,
-                        "memory_mb": vm.memory_mb,
-                    })
+                    vm_list.append(
+                        {
+                            "name": vm.name,
+                            "id": vm.id,
+                            "power_state": vm.power_state,
+                            "platform": pname,
+                            "cluster": vm.cluster,
+                            "cpu_count": vm.cpu_count,
+                            "memory_mb": vm.memory_mb,
+                        }
+                    )
 
             return {
                 "success": True,
@@ -382,7 +377,7 @@ class PlatformHandler:
             else:
                 clients = await registry.get_all_clients()
                 platforms_checked = {}
-                
+
                 for pname, client in clients.items():
                     try:
                         hosts = await client.list_hosts()
@@ -400,15 +395,17 @@ class PlatformHandler:
             host_list = []
             for pname, hosts in platforms_checked.items():
                 for host in hosts:
-                    host_list.append({
-                        "name": host.name,
-                        "id": host.id,
-                        "status": host.status,
-                        "platform": pname,
-                        "cluster": host.cluster,
-                        "cpu_capacity": host.cpu_capacity,
-                        "memory_capacity_mb": host.memory_capacity_mb,
-                    })
+                    host_list.append(
+                        {
+                            "name": host.name,
+                            "id": host.id,
+                            "status": host.status,
+                            "platform": pname,
+                            "cluster": host.cluster,
+                            "cpu_capacity": host.cpu_capacity,
+                            "memory_capacity_mb": host.memory_capacity_mb,
+                        }
+                    )
 
             return {
                 "success": True,
@@ -508,7 +505,10 @@ class PlatformHandler:
                 # Try finding by name
                 vms = await client.list_vms()
                 for vm in vms:
-                    if vm.name.lower() == identifier.lower() or identifier.lower() in vm.name.lower():
+                    if (
+                        vm.name.lower() == identifier.lower()
+                        or identifier.lower() in vm.name.lower()
+                    ):
                         return platform_name, vm
 
             except Exception as e:

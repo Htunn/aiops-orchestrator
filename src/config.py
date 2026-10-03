@@ -32,8 +32,7 @@ class Settings(BaseSettings):
 
     # GitHub Models API
     github_token: str | None = Field(
-        default=None, 
-        description="GitHub fine-grained personal access token"
+        default=None, description="GitHub fine-grained personal access token"
     )
 
     # Google Gemini API
@@ -190,7 +189,7 @@ class Settings(BaseSettings):
     otlp_endpoint: str | None = Field(
         None, description="OTLP gRPC endpoint, e.g. http://jaeger:4317"
     )
-    
+
     # AIOps - API Backend Monitoring
     api_backends_config_path: str = Field(
         default="config/api_backends.yml",
@@ -201,9 +200,7 @@ class Settings(BaseSettings):
     )
 
     # A2A (Agent-to-Agent) Integration
-    a2a_enabled: bool = Field(
-        default=False, description="Enable Agent-to-Agent integration"
-    )
+    a2a_enabled: bool = Field(default=False, description="Enable Agent-to-Agent integration")
     a2a_agent_id: str = Field(
         default="aiops-orchestrator",
         description="Unique identifier for this agent",
@@ -239,7 +236,9 @@ class Settings(BaseSettings):
         default="config/azure_resources.yml",
         description="Path to Azure subscriptions/resource-group scope configuration file",
     )
-    azure_tenant_id: str | None = Field(None, description="Entra ID tenant ID (service principal auth)")
+    azure_tenant_id: str | None = Field(
+        None, description="Entra ID tenant ID (service principal auth)"
+    )
     azure_client_id: str | None = Field(None, description="Entra ID application (client) ID")
     azure_client_secret: str | None = Field(None, description="Entra ID application client secret")
 
@@ -331,7 +330,7 @@ def load_agents_config(config_path: str | None = None) -> dict[str, Any]:
                     value = agent[field]
                     # Pattern: ${VAR_NAME} or ${VAR_NAME:-default}
                     if value.startswith("${") and "}" in value:
-                        var_spec = value[2:value.index("}")]
+                        var_spec = value[2 : value.index("}")]
                         # Check for default value syntax: ${VAR:-default}
                         if ":-" in var_spec:
                             var_name, default_val = var_spec.split(":-", 1)
@@ -387,7 +386,9 @@ def load_azure_resources_config(config_path: str | None = None) -> dict[str, Any
         if "use_managed_identity" in auth:
             resolved = _resolve(auth["use_managed_identity"])
             auth["use_managed_identity"] = (
-                str(resolved).lower() in ("true", "1", "yes") if isinstance(resolved, str) else bool(resolved)
+                str(resolved).lower() in ("true", "1", "yes")
+                if isinstance(resolved, str)
+                else bool(resolved)
             )
 
         return data

@@ -31,15 +31,17 @@ class OllamaClient(BaseAIClient):
         """
         self.base_url = base_url or settings.ollama_base_url
         self.api_key = api_key or "ollama"
-        
+
         if not self.base_url:
-            raise ValueError("Ollama base URL not configured. Set OLLAMA_BASE_URL environment variable.")
+            raise ValueError(
+                "Ollama base URL not configured. Set OLLAMA_BASE_URL environment variable."
+            )
 
         self.client = AsyncOpenAI(
             api_key=self.api_key,
             base_url=self.base_url,
         )
-        
+
         logger.info("ollama_client_initialized", base_url=self.base_url)
 
     @retry(
@@ -133,9 +135,20 @@ class OllamaClient(BaseAIClient):
         if model_lower.startswith("hf.co/"):
             return True
         common_models = [
-            "llama2", "llama3", "mistral", "mixtral", "codellama",
-            "phi", "neural-chat", "vicuna", "qwen", "deepseek-coder",
-            "orca-mini", "solar", "yi", "gemma"
+            "llama2",
+            "llama3",
+            "mistral",
+            "mixtral",
+            "codellama",
+            "phi",
+            "neural-chat",
+            "vicuna",
+            "qwen",
+            "deepseek-coder",
+            "orca-mini",
+            "solar",
+            "yi",
+            "gemma",
         ]
         return any(model_lower.startswith(m) or model_lower == m for m in common_models)
 

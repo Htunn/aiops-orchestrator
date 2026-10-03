@@ -107,7 +107,13 @@ class AzureHandler:
             return await self._execute_direct(tool_name, params)
 
         return await self._request_approval(
-            tool_name, params, risk, requested_by, channel_type, channel_target, send_message_callback
+            tool_name,
+            params,
+            risk,
+            requested_by,
+            channel_type,
+            channel_target,
+            send_message_callback,
         )
 
     async def _request_approval(
@@ -275,9 +281,7 @@ class AzureHandler:
             rg = self._require_rg(text)
             return "azure_restart_vm", {"resource_group": rg, "vm_name": restart_match.group(1)}
 
-        get_vm_match = re.search(
-            r"(?:get|show|describe)\s+vm\s+([a-z0-9][a-z0-9._()-]*)", text
-        )
+        get_vm_match = re.search(r"(?:get|show|describe)\s+vm\s+([a-z0-9][a-z0-9._()-]*)", text)
         if get_vm_match:
             rg = self._require_rg(text)
             return "azure_get_vm", {"resource_group": rg, "vm_name": get_vm_match.group(1)}

@@ -31,15 +31,17 @@ class VLLMClient(BaseAIClient):
         """
         self.base_url = base_url or settings.vllm_base_url
         self.api_key = api_key or settings.vllm_api_key or "EMPTY"
-        
+
         if not self.base_url:
-            raise ValueError("vLLM base URL not configured. Set VLLM_BASE_URL environment variable.")
+            raise ValueError(
+                "vLLM base URL not configured. Set VLLM_BASE_URL environment variable."
+            )
 
         self.client = AsyncOpenAI(
             api_key=self.api_key,
             base_url=self.base_url,
         )
-        
+
         logger.info("vllm_client_initialized", base_url=self.base_url)
 
     @retry(
@@ -124,7 +126,18 @@ class VLLMClient(BaseAIClient):
 
     def is_model_supported(self, model: str) -> bool:
         """Check if model is supported."""
-        patterns = ["llama", "mistral", "qwen", "phi", "vicuna", "yi", "mixtral", "deepseek", "codellama", "solar"]
+        patterns = [
+            "llama",
+            "mistral",
+            "qwen",
+            "phi",
+            "vicuna",
+            "yi",
+            "mixtral",
+            "deepseek",
+            "codellama",
+            "solar",
+        ]
         model_lower = model.lower()
         return any(pattern in model_lower for pattern in patterns)
 

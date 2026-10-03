@@ -43,7 +43,15 @@ agent_registry: Any = None
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan manager."""
-    global router, handler, watchloop, api_watchloop, approval_manager, mcp_manager, playbook_executor, agent_registry
+    global \
+        router, \
+        handler, \
+        watchloop, \
+        api_watchloop, \
+        approval_manager, \
+        mcp_manager, \
+        playbook_executor, \
+        agent_registry
 
     logger.info("starting_application", environment=settings.environment)
 
@@ -120,6 +128,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if settings.a2a_enabled:
         try:
             from src.services.task_delegator import get_task_delegator
+
             handler.task_delegator = get_task_delegator()
             logger.info("a2a_task_delegator_exposed_to_handler")
         except Exception as e:
@@ -231,7 +240,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
             api_backends = load_api_backend_configs()
             if not api_backends:
-                logger.info("api_watchloop_no_backends", msg="No API backends configured in config/api_backends.yml")
+                logger.info(
+                    "api_watchloop_no_backends",
+                    msg="No API backends configured in config/api_backends.yml",
+                )
             else:
                 # Reuse the same event callback as K8s watchloop — unified event handling
                 api_watchloop = ApiBackendWatchLoop(
@@ -259,9 +271,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
             # Load and register agents from config file if auto-register enabled
             agents_config = load_agents_config()
-            if (
-                agents_config
-                and agents_config.get("settings", {}).get("auto_register_on_startup", False)
+            if agents_config and agents_config.get("settings", {}).get(
+                "auto_register_on_startup", False
             ):
                 from src.database.postgres import get_db_session
 
@@ -273,7 +284,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
                             # Convert capabilities dict to AgentCapability objects
                             capabilities = [
-                                AgentCapability(**cap) for cap in agent_config.get("capabilities", [])
+                                AgentCapability(**cap)
+                                for cap in agent_config.get("capabilities", [])
                             ]
 
                             # Check if agent already registered

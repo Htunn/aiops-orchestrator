@@ -103,7 +103,9 @@ class ApiDiagnosticTools:
         for i in range(repeat):
             try:
                 start = datetime.now(UTC)
-                async with httpx.AsyncClient(timeout=float(timeout), follow_redirects=True) as client:
+                async with httpx.AsyncClient(
+                    timeout=float(timeout), follow_redirects=True
+                ) as client:
                     response = await client.request(method, url, headers=headers or {})
                 duration_ms = (datetime.now(UTC) - start).total_seconds() * 1000
 

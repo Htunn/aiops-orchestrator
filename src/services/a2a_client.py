@@ -327,9 +327,7 @@ class A2AClient:
             await asyncio.sleep(poll_interval_seconds)
             elapsed += poll_interval_seconds
 
-        raise A2ATimeoutError(
-            f"Task {task_id} did not complete within {max_wait_seconds}s"
-        )
+        raise A2ATimeoutError(f"Task {task_id} did not complete within {max_wait_seconds}s")
 
 
 # Global client instance

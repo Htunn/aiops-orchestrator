@@ -169,7 +169,9 @@ class KubernetesClient:
 
             _proxy = proxy_url
 
-            def _patched_init(self: Any, configuration: Any, pools_size: int = 4, maxsize: int | None = None) -> None:
+            def _patched_init(
+                self: Any, configuration: Any, pools_size: int = 4, maxsize: int | None = None
+            ) -> None:
                 if maxsize is None:
                     maxsize = configuration.connection_pool_maxsize
                 ssl_ctx = _ssl.create_default_context(cafile=configuration.ssl_ca_cert)

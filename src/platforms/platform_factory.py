@@ -31,7 +31,7 @@ class PlatformFactory:
             username="admin",
             password="secret"
         )
-        
+
         client = await PlatformFactory.create_client(config)
         async with client:
             vms = await client.list_vms()
@@ -125,16 +125,14 @@ class PlatformFactory:
         Example:
             class CustomClient(BasePlatformClient):
                 ...
-            
+
             PlatformFactory.register_platform(
                 PlatformType.CUSTOM,
                 CustomClient
             )
         """
         if not issubclass(client_class, BasePlatformClient):
-            raise ValueError(
-                f"Client class must inherit from BasePlatformClient: {client_class}"
-            )
+            raise ValueError(f"Client class must inherit from BasePlatformClient: {client_class}")
 
         cls._registry[platform_type] = client_class
         logger.info(

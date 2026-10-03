@@ -52,11 +52,11 @@ class PlatformRegistry:
     Example:
         registry = PlatformRegistry()
         await registry.initialize()
-        
+
         # Get a platform client
         client = await registry.get_client("production-nutanix")
         vms = await client.list_vms()
-        
+
         # Close all connections
         await registry.close_all()
     """
@@ -75,7 +75,7 @@ class PlatformRegistry:
         Priority order:
         1. Database configurations (production)
         2. Environment variables (local dev, CI/CD)
-        
+
         Loads all enabled platform configurations but doesn't create clients
         until they're requested (lazy initialization).
         """
@@ -186,10 +186,10 @@ class PlatformRegistry:
         Useful when configurations are updated dynamically.
         """
         logger.info("reloading_platform_configs")
-        
+
         # Close existing clients
         await self.close_all()
-        
+
         # Reload configs
         self._initialized = False
         await self.initialize()
@@ -229,7 +229,7 @@ class PlatformRegistry:
         # Create and initialize client
         try:
             client = await PlatformFactory.create_and_initialize(platform_config)
-            
+
             # Cache client
             async with self._lock:
                 self._clients[platform_name] = client
@@ -354,9 +354,7 @@ class PlatformRegistry:
 
         return health_results
 
-    async def _store_health_check(
-        self, platform_name: str, health: PlatformHealth
-    ) -> None:
+    async def _store_health_check(self, platform_name: str, health: PlatformHealth) -> None:
         """Store health check result in database."""
         config = self._configs.get(platform_name)
         if not config:
@@ -464,14 +462,18 @@ class PlatformRegistry:
 
         platforms = []
         for name, config in self._configs.items():
-            platforms.append({
-                "name": name,
-                "type": config.platform_type,
-                "endpoint": config.endpoint,
-                "enabled": config.enabled,
-                "health_status": config.health_status,
-                "last_health_check": config.last_health_check.isoformat() if config.last_health_check else None,
-            })
+            platforms.append(
+                {
+                    "name": name,
+                    "type": config.platform_type,
+                    "endpoint": config.endpoint,
+                    "enabled": config.enabled,
+                    "health_status": config.health_status,
+                    "last_health_check": config.last_health_check.isoformat()
+                    if config.last_health_check
+                    else None,
+                }
+            )
 
         return platforms
 

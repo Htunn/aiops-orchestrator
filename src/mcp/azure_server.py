@@ -380,9 +380,7 @@ class AzureMCPServer:
 
     async def _azure_list_vms(self, args: dict[str, Any]) -> str:
         client = await self._get_client()
-        return await self._run(
-            client.list_vms(args["resource_group"], args.get("subscription_id"))
-        )
+        return await self._run(client.list_vms(args["resource_group"], args.get("subscription_id")))
 
     async def _azure_get_vm(self, args: dict[str, Any]) -> str:
         client = await self._get_client()
